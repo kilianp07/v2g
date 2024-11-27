@@ -1,0 +1,33 @@
+name: Go Test with MQTT
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Set MQTT Broker URL
+        env:
+          MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
+        run: echo "MQTT_BROKER_URL set"
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Run tests
+        env:
+          MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
+        run: go test -v ./...
