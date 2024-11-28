@@ -19,10 +19,12 @@ jobs:
         with:
           go-version: '1.23'
 
-      - name: Set MQTT Broker URL
+      - name: Set MQTT related secrets
         env:
           MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
-        run: echo "MQTT_BROKER_URL set"
+          MQTT_USERNAME: ${{ secrets.MQTT_USERNAME }}
+          MQTT_PASSWORD: ${{ secrets.MQTT_PASSWORD }}
+        run: echo " MQTT vars set"
 
       - name: Install dependencies
         run: go mod tidy
@@ -30,4 +32,6 @@ jobs:
       - name: Run tests
         env:
           MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
+          MQTT_USERNAME: ${{ secrets.MQTT_USERNAME }}
+          MQTT_PASSWORD: ${{ secrets.MQTT_PASSWORD }}
         run: go test -v ./...
