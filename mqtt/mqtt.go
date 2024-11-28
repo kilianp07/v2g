@@ -8,7 +8,7 @@ import (
 
 // MQTTClient defines the methods for an MQTT client wrapper.
 type MQTTClient interface {
-	Connect(brokerURL string, clientID string) error
+	Connect(brokerURL string, clientID string, options ...ConnectOption) error
 	Publish(topic string, payload interface{}, qos byte) error
 	Subscribe(topic string, qos byte, callback MessageHandler) error
 	Disconnect()
@@ -37,16 +37,32 @@ func (m *mqttMessage) Duplicate() bool { return m.msg.Duplicate() }
 func (m *mqttMessage) QoS() byte       { return m.msg.Qos() }
 func (m *mqttMessage) Retained() bool  { return m.msg.Retained() }
 
+// ConnectOption defines a functional option for configuring the MQTT client.
+type ConnectOption func(opts *mqtt.ClientOptions)
+
+// WithPasswordAuth adds username and password authentication to the MQTT client.
+func WithPasswordAuth(username, password string) ConnectOption {
+	return func(opts *mqtt.ClientOptions) {
+		opts.SetUsername(username)
+		opts.SetPassword(password)
+	}
+}
+
 // MQTTClientWrapper implements MQTTClient using paho.mqtt.golang.
 type MQTTClientWrapper struct {
 	client mqtt.Client
 }
 
-// Connect establishes a connection to the MQTT broker.
-func (m *MQTTClientWrapper) Connect(brokerURL string, clientID string) error {
+// Connect establishes a connection to the MQTT broker with optional configurations.
+func (m *MQTTClientWrapper) Connect(brokerURL string, clientID string, options ...ConnectOption) error {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(brokerURL)
 	opts.SetClientID(clientID)
+
+	// Apply additional options
+	for _, option := range options {
+		option(opts)
+	}
 
 	m.client = mqtt.NewClient(opts)
 	if token := m.client.Connect(); token.Wait() && token.Error() != nil {
