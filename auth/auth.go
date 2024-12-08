@@ -3,26 +3,21 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
-
-var authenticator *ClientCred
 
 type ClientCred struct {
 	conf  clientcredentials.Config
 	token *oauth2.Token
 }
 
-func NewClientCred(conf Conf) {
-	authenticator = &ClientCred{
+func NewClientCred(conf Conf) *ClientCred {
+	return &ClientCred{
 		conf: conf.toOauth2Config(),
 	}
-}
-
-func Authenticator() *ClientCred {
-	return authenticator
 }
 
 // GetToken retrieves a valid access token. If the current token is valid, it returns the existing token.
@@ -32,13 +27,19 @@ func (c *ClientCred) GetToken() (string, error) {
 	if c.token.Valid() {
 		return c.token.AccessToken, nil
 	}
+	if err := c.getToken(); err != nil {
+		return "", err
+	}
+	return c.token.AccessToken, nil
+}
+
+func (c *ClientCred) getToken() error {
 	var err error
 	c.token, err = c.conf.Token(context.Background())
 	if err != nil {
-		return "", fmt.Errorf("failed to get token: %w", err)
+		return fmt.Errorf("failed to get token: %w", err)
 	}
-
-	return c.token.AccessToken, nil
+	return nil
 }
 
 // ForceRefresh retrieves a new token using the client credentials configuration
@@ -56,4 +57,16 @@ func (c *ClientCred) ForceRefresh() (string, error) {
 	}
 
 	return c.token.AccessToken, nil
+}
+func (c *ClientCred) SetAuthHeader(r *http.Request) error {
+	if c.token.Valid() {
+		c.token.SetAuthHeader(r)
+		return nil
+	}
+
+	if err := c.getToken(); err != nil {
+		return err
+	}
+	c.token.SetAuthHeader(r)
+	return nil
 }
