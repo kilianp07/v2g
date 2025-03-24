@@ -11,8 +11,15 @@ type Logger interface {
 	SetFormatter(formatter formatter.Formatter)
 	SetOutput(output *os.File)
 	SetLevel(level Level)
+
+	Debug(args ...any)
 	Info(args ...any)
+	Warn(args ...any)
 	Error(args ...any)
+	Fatal(args ...any)
+
+	WithField(key string, value any) Logger
+	WithFields(fields map[string]any) Logger
 }
 
 type Level int
