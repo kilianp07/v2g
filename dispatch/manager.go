@@ -54,8 +54,8 @@ func (dm *DispatchManager) UpdateVehicleState(vehicleID string, soc float64, ava
 
 // SelectVehicles determines the optimal vehicles to respond to a flexibility signal.
 func (dm *DispatchManager) SelectVehicles(signal FlexibilitySignal) ([]Vehicle, map[string]float64, error) {
-	dm.mutex.RLock()
-	defer dm.mutex.RUnlock()
+	dm.mutex.Lock()
+	defer dm.mutex.Unlock()
 
 	if len(dm.vehicles) == 0 {
 		return nil, nil, nil

@@ -45,9 +45,9 @@ func TestReallocatePower(t *testing.T) {
 			failedVehicleID: "v1",
 			expectedStates: map[string]bool{
 				"v1": false,
-				"v2": false,
+				"v2": true,
 			},
-			expectedPowerOut: 0,
+			expectedPowerOut: 5,
 		},
 		{
 			name: "partial reallocation due to SOC",
@@ -60,9 +60,9 @@ func TestReallocatePower(t *testing.T) {
 			expectedStates: map[string]bool{
 				"v1": false,
 				"v2": true,
-				"v3": false,
+				"v3": true,
 			},
-			expectedPowerOut: 3,
+			expectedPowerOut: 2,
 		},
 	}
 
@@ -71,7 +71,12 @@ func TestReallocatePower(t *testing.T) {
 			dm := &DispatchManager{
 				vehicles: tt.vehicles,
 			}
-			dm.ReallocatePower(tt.failedVehicleID)
+			dm.configurableSOC = map[string]float64{"low": 20}
+			actualPowerOut := dm.ReallocatePower(tt.failedVehicleID)
+
+			if tt.expectedPowerOut != actualPowerOut {
+				t.Errorf("power output: want %.2f, got %.2f", tt.expectedPowerOut, actualPowerOut)
+			}
 
 			for _, v := range dm.vehicles {
 				if want, got := tt.expectedStates[v.ID], v.Available; want != got {

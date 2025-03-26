@@ -18,7 +18,7 @@ func (dm *DispatchManager) HandleVehicleFeedback(vehicleID string, success bool)
 }
 
 // ReallocatePower attempts to redistribute power to other available vehicles.
-func (dm *DispatchManager) ReallocatePower(failedVehicleID string) {
+func (dm *DispatchManager) ReallocatePower(failedVehicleID string) float64 {
 	dm.mutex.Lock()
 	defer dm.mutex.Unlock()
 
@@ -26,7 +26,7 @@ func (dm *DispatchManager) ReallocatePower(failedVehicleID string) {
 		"failed_vehicle_id": failedVehicleID,
 	}).Info("Attempting power reallocation.")
 
-	// Marquer le véhicule comme indisponible et récupérer sa puissance
+	// Mark the failed vehicle as unavailable and get its power
 	remainingPower := 0.0
 	found := false
 	for i := range dm.vehicles {
@@ -39,9 +39,10 @@ func (dm *DispatchManager) ReallocatePower(failedVehicleID string) {
 	}
 	if !found {
 		logger.Log.WithField("vehicle_id", failedVehicleID).Warn("Failed vehicle not found in vehicle list.")
-		return
+		return 0
 	}
 
+	initialPower := remainingPower
 	if remainingPower > 0 {
 		logger.Log.WithFields(logrus.Fields{
 			"failed_vehicle_id":   failedVehicleID,
@@ -52,9 +53,10 @@ func (dm *DispatchManager) ReallocatePower(failedVehicleID string) {
 			if dm.vehicles[i].ID == failedVehicleID {
 				continue
 			}
-			if dm.vehicles[i].Available && dm.vehicles[i].StateOfCharge > 20.0 {
+			thresholdLow := dm.configurableSOC["low"]
+			if dm.vehicles[i].Available && dm.vehicles[i].StateOfCharge > thresholdLow {
 				allocatedPower := math.Min(remainingPower, dm.vehicles[i].MaxPower)
-				dm.vehicles[i].Available = false
+				// Keep the vehicle available for future dispatches
 
 				logger.Log.WithFields(logrus.Fields{
 					"vehicle_id":      dm.vehicles[i].ID,
@@ -70,4 +72,6 @@ func (dm *DispatchManager) ReallocatePower(failedVehicleID string) {
 	} else {
 		logger.Log.Warn("No remaining power to reallocate.")
 	}
+
+	return initialPower - remainingPower
 }
