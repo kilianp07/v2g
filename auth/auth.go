@@ -24,7 +24,7 @@ func NewClientCred(conf Conf) *ClientCred {
 // Otherwise, it requests a new token using the client credentials configuration.
 // Returns the access token as a string and an error if the token retrieval fails.
 func (c *ClientCred) GetToken() (string, error) {
-	if c.token.Valid() {
+	if c.token != nil && c.token.Valid() {
 		return c.token.AccessToken, nil
 	}
 	if err := c.getToken(); err != nil {
@@ -59,7 +59,7 @@ func (c *ClientCred) ForceRefresh() (string, error) {
 	return c.token.AccessToken, nil
 }
 func (c *ClientCred) SetAuthHeader(r *http.Request) error {
-	if c.token.Valid() {
+	if c.token != nil && c.token.Valid() {
 		c.token.SetAuthHeader(r)
 		return nil
 	}

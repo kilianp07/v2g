@@ -22,6 +22,9 @@ type MockMQTTClient struct {
 
 // Test Connect
 func TestMQTTClientWrapper_Connect(t *testing.T) {
+	if mqttUrl == "" {
+		t.Skip("MQTT_BROKER_URL not set")
+	}
 	client := &MQTTClientWrapper{}
 	err := client.Connect(mqttUrl, "go unit test", WithPasswordAuth(os.Getenv("MQTT_USERNAME"), os.Getenv("MQTT_PASSWORD")))
 	assert.NoError(t, err, "Connect should not return an error")
@@ -29,6 +32,9 @@ func TestMQTTClientWrapper_Connect(t *testing.T) {
 
 // Test Publish
 func TestMQTTClientWrapper_Publish(t *testing.T) {
+	if mqttUrl == "" {
+		t.Skip("MQTT_BROKER_URL not set")
+	}
 	client := &MQTTClientWrapper{}
 
 	err := client.Connect(mqttUrl, "go unit test", WithPasswordAuth(os.Getenv("MQTT_USERNAME"), os.Getenv("MQTT_PASSWORD")))
@@ -40,6 +46,9 @@ func TestMQTTClientWrapper_Publish(t *testing.T) {
 
 // Test Disconnect
 func TestMQTTClientWrapper_Disconnect(t *testing.T) {
+	if mqttUrl == "" {
+		t.Skip("MQTT_BROKER_URL not set")
+	}
 	client := MQTTClientWrapper{}
 
 	err := client.Connect(mqttUrl, "go unit test", WithPasswordAuth(os.Getenv("MQTT_USERNAME"), os.Getenv("MQTT_PASSWORD")))
