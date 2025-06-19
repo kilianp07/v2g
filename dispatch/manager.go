@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kilianp07/v2g/logger"
+	mqttwrapper "github.com/kilianp07/v2g/mqtt"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,10 +17,12 @@ type DispatchManager struct {
 	vehicles        []Vehicle
 	mutex           sync.RWMutex
 	configurableSOC map[string]float64 // Configurable SOC thresholds
+	mqttClient      mqttwrapper.MQTTClient
+	topicPrefix     string
 }
 
 // NewDispatchManager initializes a new DispatchManager.
-func NewDispatchManager(vehicles []Vehicle, socThresholds map[string]float64) (*DispatchManager, error) {
+func NewDispatchManager(vehicles []Vehicle, socThresholds map[string]float64, client mqttwrapper.MQTTClient, topic string) (*DispatchManager, error) {
 	if socThresholds["low"] < 0 || socThresholds["low"] > 100 || socThresholds["high"] < 0 || socThresholds["high"] > 100 {
 		return nil, errors.New("SOC thresholds must be between 0 and 100")
 	}
@@ -30,6 +33,8 @@ func NewDispatchManager(vehicles []Vehicle, socThresholds map[string]float64) (*
 	return &DispatchManager{
 		vehicles:        vehicles,
 		configurableSOC: socThresholds,
+		mqttClient:      client,
+		topicPrefix:     topic,
 	}, nil
 }
 
