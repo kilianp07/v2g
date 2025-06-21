@@ -13,7 +13,7 @@ import (
 
 // TestIntegration verifies publishing and subscribing using a real Mosquitto broker.
 func TestIntegration(t *testing.T) {
-	if _, err := os.Stat("/var/run/docker.sock"); err != nil {
+	if os.Getenv("DOCKER_AVAILABLE") != "true" && os.Getenv("DOCKER_AVAILABLE") != "1" {
 		t.Skip("docker not available")
 	}
 	ctx := context.Background()
@@ -29,7 +29,14 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start container: %v", err)
 	}
-	defer container.Terminate(ctx)
+	defer func() {
+		if err := container.Terminate(ctx); err != nil {
+			t.Fatalf("failed to terminate container: %v", err)
+		}
+	}()
+
+	// give broker time to fully start
+	time.Sleep(500 * time.Millisecond)
 
 	host, err := container.Host(ctx)
 	if err != nil {
@@ -42,8 +49,16 @@ func TestIntegration(t *testing.T) {
 
 	brokerURL := fmt.Sprintf("tcp://%s:%s", host, port.Port())
 	client := &MQTTClientWrapper{}
-	if err := client.Connect(brokerURL, "pub"); err != nil {
-		t.Fatalf("failed to connect: %v", err)
+	var connectErr error
+	for i := 0; i < 5; i++ {
+		connectErr = client.Connect(brokerURL, "pub")
+		if connectErr == nil {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if connectErr != nil {
+		t.Fatalf("failed to connect: %v", connectErr)
 	}
 	defer client.Disconnect()
 

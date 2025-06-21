@@ -24,6 +24,7 @@ jobs:
           MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
           MQTT_USERNAME: ${{ secrets.MQTT_USERNAME }}
           MQTT_PASSWORD: ${{ secrets.MQTT_PASSWORD }}
+          DOCKER_AVAILABLE: "1"
         run: echo " MQTT vars set"
 
       - name: Install dependencies
@@ -34,4 +35,5 @@ jobs:
           MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
           MQTT_USERNAME: ${{ secrets.MQTT_USERNAME }}
           MQTT_PASSWORD: ${{ secrets.MQTT_PASSWORD }}
+          DOCKER_AVAILABLE: "1"
         run: go test -v ./...
