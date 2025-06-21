@@ -15,7 +15,7 @@ go test ./...
 
 - **model**: domain objects such as `Vehicle` and `FlexibilitySignal`.
 - **mqtt**: MQTT client interface and implementations.
-- **dispatch**: core logic that filters vehicles, allocates power and publishes orders.
+ - **dispatch**: core logic that filters vehicles, allocates power and publishes orders. `SmartDispatcher` provides weighted scoring with fairness and market price awareness. `LPDispatcher` solves a linear program for optimal allocation, and weight tuning can be automated via a `LearningTuner`.
 - **logger**: simple logging abstraction with a no-op implementation and a
   Zerolog-based logger for structured output. Use `logger.New(component)` to
   obtain a logger instance. The environment is detected via the `APP_ENV`

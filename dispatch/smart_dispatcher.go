@@ -1,0 +1,173 @@
+package dispatch
+
+import (
+	"math"
+
+	"github.com/kilianp07/v2g/model"
+)
+
+// SmartDispatcher allocates power using a weighted greedy strategy. Scores are
+// computed from energy slack, time until departure and charging priority. The
+// weights can be tuned and dynamically adapted based on the signal type. A
+// participation score allows fairness between vehicles.
+type SmartDispatcher struct {
+	SocWeight      float64
+	TimeWeight     float64
+	PriorityWeight float64
+	PriceWeight    float64
+	WearWeight     float64
+	FairnessWeight float64
+	MarketPrice    float64
+	Participation  map[string]float64
+	MaxRounds      int
+}
+
+type candidate struct {
+	v        model.Vehicle
+	score    float64
+	capacity float64
+}
+
+func (d SmartDispatcher) buildCandidates(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx DispatchContext) []candidate {
+	var list []candidate
+	for _, v := range vehicles {
+		energy := (v.SoC - v.MinSoC) * v.BatteryKWh
+		if energy <= 0 {
+			continue
+		}
+		cap := v.MaxPower
+		if signal.Duration > 0 {
+			maxFromEnergy := energy / signal.Duration.Hours()
+			if maxFromEnergy < cap {
+				cap = maxFromEnergy
+			}
+		}
+		if cap <= 0 {
+			continue
+		}
+		list = append(list, candidate{v: v, score: d.vehicleScore(v, ctx), capacity: cap})
+	}
+	return list
+}
+
+// NewSmartDispatcher returns a dispatcher with sensible default weights.
+func NewSmartDispatcher() SmartDispatcher {
+	return SmartDispatcher{
+		SocWeight:      0.5,
+		TimeWeight:     0.3,
+		PriorityWeight: 0.1,
+		PriceWeight:    0.05,
+		WearWeight:     0.05,
+		FairnessWeight: 0.05,
+		Participation:  make(map[string]float64),
+		MaxRounds:      10,
+	}
+}
+
+func (d SmartDispatcher) weightsForSignal(t model.SignalType) (float64, float64, float64, float64, float64, float64) {
+	soc := d.SocWeight
+	tm := d.TimeWeight
+	prio := d.PriorityWeight
+	price := d.PriceWeight
+	wear := d.WearWeight
+	fair := d.FairnessWeight
+	switch t {
+	case model.SignalFCR:
+		// Emphasise immediate power capability
+		soc += 0.2
+		prio += 0.1
+	case model.SignalNEBEF:
+		// Availability over a longer window
+		soc += 0.1
+		tm += 0.2
+	case model.SignalMA, model.SignalEcoWatt:
+		soc += 0.1
+	}
+	return soc, tm, prio, price, wear, fair
+}
+
+// vehicleScore computes the weighted score for a vehicle.
+func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx DispatchContext) float64 {
+	socW, timeW, prioW, priceW, wearW, fairW := d.weightsForSignal(ctx.Signal.Type)
+	energyNorm := v.SoC - v.MinSoC
+	if energyNorm < 0 {
+		energyNorm = 0
+	}
+	if energyNorm > 1 {
+		energyNorm = 1
+	}
+	minutes := v.Departure.Sub(ctx.Now).Minutes()
+	timeScore := 0.0
+	if minutes > 0 {
+		timeScore = math.Exp(-minutes / 30.0)
+	}
+	priority := 1.0
+	if v.Priority {
+		priority = 0
+	}
+	wear := ctx.ParticipationScore[v.ID]
+	score := energyNorm*socW + timeScore*timeW + priority*prioW + energyNorm*ctx.MarketPrice*priceW
+	score -= wear*wearW + wear*fairW
+	if score < 0 {
+		return 0
+	}
+	return score
+}
+
+// Dispatch implements the Dispatcher interface using the greedy weighted scores.
+func (d SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
+	assignments := make(map[string]float64)
+	if len(vehicles) == 0 || signal.PowerKW == 0 {
+		return assignments
+	}
+
+	ctx := DispatchContext{Signal: signal, Now: signal.Timestamp, MarketPrice: d.MarketPrice, ParticipationScore: d.Participation}
+
+	list := d.buildCandidates(vehicles, signal, ctx)
+	if len(list) == 0 {
+		return assignments
+	}
+
+	remaining := math.Abs(signal.PowerKW)
+	sign := 1.0
+	if signal.PowerKW < 0 {
+		sign = -1
+	}
+
+	rounds := 0
+	for remaining > 0 && len(list) > 0 && (d.MaxRounds == 0 || rounds < d.MaxRounds) {
+		var consumed float64
+		list, consumed = d.allocateRound(list, sign, remaining, assignments)
+		remaining -= consumed
+		if consumed == 0 {
+			break
+		}
+		rounds++
+	}
+	return assignments
+}
+
+func (d SmartDispatcher) allocateRound(list []candidate, sign, remaining float64, assignments map[string]float64) ([]candidate, float64) {
+	var weightSum float64
+	for _, c := range list {
+		weightSum += c.score
+	}
+	if weightSum == 0 {
+		return nil, 0
+	}
+	consumed := 0.0
+	next := list[:0]
+	for _, c := range list {
+		share := remaining * (c.score / weightSum)
+		if share >= c.capacity {
+			assignments[c.v.ID] += sign * c.capacity
+			consumed += c.capacity
+		} else {
+			assignments[c.v.ID] += sign * share
+			c.capacity -= share
+			consumed += share
+			next = append(next, c)
+		}
+	}
+	return next, consumed
+}
