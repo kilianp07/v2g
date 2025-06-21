@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
 )
@@ -46,7 +47,7 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 		{ID: "v2", SoC: 0.7, IsV2G: true, Available: true, MaxPower: 50},
 	}
 	publisher := mqtt.NewMockPublisher()
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestDispatchManager_Fallback(t *testing.T) {
 	}
 	publisher := mqtt.NewMockPublisher()
 	publisher.FailIDs["v1"] = true
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
