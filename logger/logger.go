@@ -19,9 +19,5 @@ func (NopLogger) Errorf(string, ...any) {}
 // New returns a Logger for the given component. The environment is detected via
 // the APP_ENV variable.
 func New(component string) Logger {
-	l := NewZerologLogger(component)
-	if l == nil {
-		return nil
-	}
-	return *l
+	return NewZerologLogger(component)
 }

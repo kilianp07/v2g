@@ -15,18 +15,16 @@ type ZerologLogger struct {
 
 // NewZerologLogger creates a ZerologLogger using the APP_ENV environment variable
 // to determine the output format. All logs include the provided component field.
-func NewZerologLogger(component string) *Logger {
+func NewZerologLogger(component string) Logger {
 	env := strings.ToLower(os.Getenv("APP_ENV"))
 	var z zerolog.Logger
 	if env == "dev" {
 		writer := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
 		z = zerolog.New(writer).With().Timestamp().Str("component", component).Logger()
 	} else {
-		zerolog.TimeFieldFormat = time.RFC3339
 		z = zerolog.New(os.Stdout).With().Timestamp().Str("component", component).Logger()
 	}
-	var l Logger = &ZerologLogger{log: z}
-	return &l
+	return &ZerologLogger{log: z}
 }
 
 func (l *ZerologLogger) Debugf(format string, args ...any) {

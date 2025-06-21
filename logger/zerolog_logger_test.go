@@ -10,11 +10,7 @@ import (
 func TestZerologLoggerMethods(t *testing.T) {
 	assert.NoError(t, os.Setenv("APP_ENV", "dev"))
 	defer assert.NoError(t, os.Unsetenv("APP_ENV"))
-	lptr := NewZerologLogger("test")
-	if lptr == nil {
-		t.Fatalf("nil pointer returned")
-	}
-	l := *lptr
+	l := NewZerologLogger("test")
 	if l == nil {
 		t.Fatalf("nil logger")
 	}
