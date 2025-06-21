@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -13,21 +14,30 @@ type DispatchManager struct {
 	dispatcher Dispatcher
 	fallback   FallbackStrategy
 	publisher  mqtt.Client
-	mu         sync.Mutex
+	ackTimeout time.Duration
 }
 
 // NewDispatchManager creates a new manager.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client) *DispatchManager {
+// ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
+// If ackTimeout is zero, a default of five seconds is used.
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
-		panic("dispatch: nil parameter provided to NewDispatchManager")
+		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
-	return &DispatchManager{filter: filter, dispatcher: dispatcher, fallback: fallback, publisher: publisher}
+	if ackTimeout <= 0 {
+		ackTimeout = 5 * time.Second
+	}
+	return &DispatchManager{
+		filter:     filter,
+		dispatcher: dispatcher,
+		fallback:   fallback,
+		publisher:  publisher,
+		ackTimeout: ackTimeout,
+	}, nil
 }
 
 // Dispatch runs the dispatch process.
 func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
-	m.mu.Lock()
-
 	filtered := m.filter.Filter(vehicles, signal)
 	assignments := m.dispatcher.Dispatch(filtered, signal)
 
@@ -40,22 +50,33 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		result.Assignments[id] = p
 	}
 
-	for id, power := range result.Assignments {
-		cmdID, err := m.publisher.SendOrder(id, power)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	update := func(id string, ack bool, err error) {
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			result.Errors[id] = err
-			result.Acknowledged[id] = false
-			continue
 		}
-		if ok, err := m.publisher.WaitForAck(cmdID, 5*time.Second); err != nil || !ok {
-			if err != nil {
-				result.Errors[id] = err
-			}
-			result.Acknowledged[id] = false
-		} else {
-			result.Acknowledged[id] = true
-		}
+		result.Acknowledged[id] = err == nil && ack
 	}
+	for id, power := range result.Assignments {
+		id := id
+		power := power
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cmdID, err := m.publisher.SendOrder(id, power)
+			if err == nil {
+				var ok bool
+				ok, err = m.publisher.WaitForAck(cmdID, m.ackTimeout)
+				update(id, ok, err)
+			} else {
+				update(id, false, err)
+			}
+		}()
+	}
+	wg.Wait()
 
 	var failed []model.Vehicle
 	for _, v := range filtered {
@@ -66,7 +87,5 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	if len(failed) > 0 {
 		result.FallbackAssignments = m.fallback.Reallocate(failed, result.Assignments, signal)
 	}
-
-	m.mu.Unlock()
 	return result
 }

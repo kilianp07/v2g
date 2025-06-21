@@ -46,7 +46,10 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 		{ID: "v2", SoC: 0.7, IsV2G: true, Available: true, MaxPower: 50},
 	}
 	publisher := mqtt.NewMockPublisher()
-	manager := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	sig := model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 80, Timestamp: time.Now()}
 
 	res := manager.Dispatch(sig, vehicles)
@@ -68,7 +71,10 @@ func TestDispatchManager_Fallback(t *testing.T) {
 	}
 	publisher := mqtt.NewMockPublisher()
 	publisher.FailIDs["v1"] = true
-	manager := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	sig := model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 80, Timestamp: time.Now()}
 
 	res := manager.Dispatch(sig, vehicles)
