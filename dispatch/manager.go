@@ -1,102 +1,63 @@
 package dispatch
 
 import (
-	"errors"
-	"math"
-	"sort"
 	"sync"
-	"time"
 
-	"github.com/kilianp07/v2g/logger"
-	"github.com/sirupsen/logrus"
+	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/mqtt"
 )
 
-// DispatchManager manages V2G dispatch decisions.
 type DispatchManager struct {
-	vehicles        []Vehicle
-	mutex           sync.RWMutex
-	configurableSOC map[string]float64 // Configurable SOC thresholds
+	filter     VehicleFilter
+	dispatcher Dispatcher
+	fallback   FallbackStrategy
+	publisher  mqtt.Publisher
+	mu         sync.Mutex
 }
 
-// NewDispatchManager initializes a new DispatchManager.
-func NewDispatchManager(vehicles []Vehicle, socThresholds map[string]float64) (*DispatchManager, error) {
-	if socThresholds["low"] < 0 || socThresholds["low"] > 100 || socThresholds["high"] < 0 || socThresholds["high"] > 100 {
-		return nil, errors.New("SOC thresholds must be between 0 and 100")
+// NewDispatchManager creates a new manager.
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Publisher) *DispatchManager {
+	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
+		panic("dispatch: nil parameter provided to NewDispatchManager")
 	}
-	if socThresholds["low"] >= socThresholds["high"] {
-		return nil, errors.New("'low' threshold must be less than 'high' threshold")
-	}
-
-	return &DispatchManager{
-		vehicles:        vehicles,
-		configurableSOC: socThresholds,
-	}, nil
+	return &DispatchManager{filter: filter, dispatcher: dispatcher, fallback: fallback, publisher: publisher}
 }
 
-// UpdateVehicleState dynamically updates the state of vehicles.
-func (dm *DispatchManager) UpdateVehicleState(vehicleID string, soc float64, available bool) {
-	dm.mutex.Lock()
-	defer dm.mutex.Unlock()
-	for i := range dm.vehicles {
-		if dm.vehicles[i].ID == vehicleID {
-			dm.vehicles[i].StateOfCharge = soc
-			dm.vehicles[i].Available = available
-			dm.vehicles[i].LastUpdate = time.Now()
-			logger.Log.WithFields(logrus.Fields{
-				"vehicle_id":      vehicleID,
-				"state_of_charge": soc,
-				"available":       available,
-			}).Info("Vehicle state updated")
-			break
-		}
+// Dispatch runs the dispatch process.
+func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
+	m.mu.Lock()
+
+	filtered := m.filter.Filter(vehicles, signal)
+	assignments := m.dispatcher.Dispatch(filtered, signal)
+
+	result := DispatchResult{
+		Assignments:  make(map[string]float64, len(assignments)),
+		Errors:       make(map[string]error),
+		Acknowledged: make(map[string]bool),
 	}
-}
-
-// SelectVehicles determines the optimal vehicles to respond to a flexibility signal.
-func (dm *DispatchManager) SelectVehicles(signal FlexibilitySignal) ([]Vehicle, map[string]float64, error) {
-	dm.mutex.Lock()
-	defer dm.mutex.Unlock()
-
-	if len(dm.vehicles) == 0 {
-		return nil, nil, nil
+	for id, p := range assignments {
+		result.Assignments[id] = p
 	}
 
-	selected := []Vehicle{}
-	powerAllocation := make(map[string]float64)
-	remainingPower := signal.Power
-
-	sort.Slice(dm.vehicles, func(i, j int) bool {
-		if dm.vehicles[i].Priority == dm.vehicles[j].Priority {
-			if dm.vehicles[i].StateOfCharge == dm.vehicles[j].StateOfCharge {
-				return dm.vehicles[i].Tariff < dm.vehicles[j].Tariff
-			}
-			return dm.vehicles[i].StateOfCharge > dm.vehicles[j].StateOfCharge
-		}
-		return dm.vehicles[i].Priority > dm.vehicles[j].Priority
-	})
-
-	thresholdLow := dm.configurableSOC["low"]
-	thresholdHigh := dm.configurableSOC["high"]
-
-	for i := range dm.vehicles {
-		if !dm.vehicles[i].Available {
-			continue
-		}
-		allocatedPower := math.Min(remainingPower, dm.vehicles[i].MaxPower)
-		if (signal.Type == "LOAD_SHEDDING" && dm.vehicles[i].StateOfCharge < thresholdHigh) ||
-			(signal.Type != "LOAD_SHEDDING" && dm.vehicles[i].StateOfCharge > thresholdLow) {
-			selected = append(selected, dm.vehicles[i])
-			powerAllocation[dm.vehicles[i].ID] = allocatedPower
-			remainingPower -= allocatedPower
-			if remainingPower <= 0 {
-				break
-			}
+	for id, power := range result.Assignments {
+		if err := m.publisher.Publish(id, power); err != nil {
+			result.Errors[id] = err
+			result.Acknowledged[id] = false
+		} else {
+			result.Acknowledged[id] = true
 		}
 	}
 
-	if len(selected) == 0 {
-		return nil, nil, nil
+	var failed []model.Vehicle
+	for _, v := range filtered {
+		if !result.Acknowledged[v.ID] {
+			failed = append(failed, v)
+		}
+	}
+	if len(failed) > 0 {
+		result.FallbackAssignments = m.fallback.Reallocate(failed, result.Assignments, signal)
 	}
 
-	return selected, powerAllocation, nil
+	m.mu.Unlock()
+	return result
 }
