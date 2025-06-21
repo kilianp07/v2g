@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
 )
@@ -15,17 +16,21 @@ type DispatchManager struct {
 	fallback   FallbackStrategy
 	publisher  mqtt.Client
 	ackTimeout time.Duration
+	logger     logger.Logger
 }
 
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, log logger.Logger) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
 	if ackTimeout <= 0 {
 		ackTimeout = 5 * time.Second
+	}
+	if log == nil {
+		log = logger.NopLogger{}
 	}
 	return &DispatchManager{
 		filter:     filter,
@@ -33,6 +38,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		fallback:   fallback,
 		publisher:  publisher,
 		ackTimeout: ackTimeout,
+		logger:     log,
 	}, nil
 }
 
@@ -40,6 +46,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
 	filtered := m.filter.Filter(vehicles, signal)
 	assignments := m.dispatcher.Dispatch(filtered, signal)
+	m.logger.Infof("dispatching %s to %d vehicles", signal.Type, len(filtered))
 
 	result := DispatchResult{
 		Assignments:  make(map[string]float64, len(assignments)),
@@ -85,6 +92,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		}
 	}
 	if len(failed) > 0 {
+		m.logger.Warnf("%d vehicles failed, reallocating", len(failed))
 		result.FallbackAssignments = m.fallback.Reallocate(failed, result.Assignments, signal)
 	}
 	return result

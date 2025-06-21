@@ -11,6 +11,7 @@ manager, err := dispatch.NewDispatchManager(
     dispatch.NoopFallback{},
     mqtt.NewMockPublisher(),
     5*time.Second,
+    logger.New("dispatch"),
 )
 ```
 

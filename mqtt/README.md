@@ -8,4 +8,6 @@ It contains a mock implementation used in tests as well as a production client
 based on the Eclipse Paho library with automatic reconnection and optional TLS
 support. Logging is performed via the `logger` package which defines an
 interface covering debug, info, warning and error levels, along with a
-`NopLogger` implementation used by default.
+`NopLogger` implementation used by default. A `ZerologLogger` based on
+[`rs/zerolog`](https://github.com/rs/zerolog) is available for structured
+logging.

@@ -36,6 +36,7 @@
 //	        dispatch.NoopFallback{},
 //	        mqtt.NewMockPublisher(),
 //	        5*time.Second,
+//		logger.New("dispatch"),
 //	)
 //	if err != nil {
 //	        log.Fatalf("failed to create manager: %v", err)
