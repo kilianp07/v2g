@@ -30,12 +30,16 @@
 //
 // Usage example:
 //
-//	manager := dispatch.NewDispatchManager(
-//		dispatch.SimpleVehicleFilter{},
-//		dispatch.EqualDispatcher{},
-//		dispatch.NoopFallback{},
-//		mqtt.NewMockPublisher(),
+//	manager, err := dispatch.NewDispatchManager(
+//	        dispatch.SimpleVehicleFilter{},
+//	        dispatch.EqualDispatcher{},
+//	        dispatch.NoopFallback{},
+//	        mqtt.NewMockPublisher(),
+//	        5*time.Second,
 //	)
+//	if err != nil {
+//	        log.Fatalf("failed to create manager: %v", err)
+//	}
 //	result := manager.Dispatch(signal, vehicles)
 //
 // This package follows SOLID principles, is thread-safe, and production-ready.
