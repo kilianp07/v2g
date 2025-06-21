@@ -1,3 +1,4 @@
 // Package mqtt provides an interface for sending power commands to vehicles
-// over MQTT. In tests it is substituted by a mock publisher.
+// over MQTT and receiving acknowledgments. It includes an implementation based
+// on the Eclipse Paho client and a mock publisher used in tests.
 package mqtt
