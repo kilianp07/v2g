@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"sync"
+	"time"
 
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
@@ -11,12 +12,12 @@ type DispatchManager struct {
 	filter     VehicleFilter
 	dispatcher Dispatcher
 	fallback   FallbackStrategy
-	publisher  mqtt.Publisher
+	publisher  mqtt.Client
 	mu         sync.Mutex
 }
 
 // NewDispatchManager creates a new manager.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Publisher) *DispatchManager {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client) *DispatchManager {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		panic("dispatch: nil parameter provided to NewDispatchManager")
 	}
@@ -40,8 +41,16 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	}
 
 	for id, power := range result.Assignments {
-		if err := m.publisher.Publish(id, power); err != nil {
+		cmdID, err := m.publisher.SendOrder(id, power)
+		if err != nil {
 			result.Errors[id] = err
+			result.Acknowledged[id] = false
+			continue
+		}
+		if ok, err := m.publisher.WaitForAck(cmdID, 5*time.Second); err != nil || !ok {
+			if err != nil {
+				result.Errors[id] = err
+			}
 			result.Acknowledged[id] = false
 		} else {
 			result.Acknowledged[id] = true
