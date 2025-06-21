@@ -16,6 +16,9 @@ go test ./...
 - **model**: domain objects such as `Vehicle` and `FlexibilitySignal`.
 - **mqtt**: MQTT client interface and implementations.
 - **dispatch**: core logic that filters vehicles, allocates power and publishes orders.
-- **logger**: simple logging abstraction.
+- **logger**: simple logging abstraction with a no-op implementation and a
+  Zerolog-based logger for structured output. Use `logger.New(component)` to
+  obtain a logger instance. The environment is detected via the `APP_ENV`
+  variable.
 
 See individual package READMEs for more details.
