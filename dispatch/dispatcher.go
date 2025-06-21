@@ -10,13 +10,44 @@ func (d EqualDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibi
 	if len(vehicles) == 0 {
 		return assignments
 	}
-	powerPerVehicle := signal.PowerKW / float64(len(vehicles))
+
+	share := signal.PowerKW / float64(len(vehicles))
+	remaining := signal.PowerKW
+	var needMore []model.Vehicle
 	for _, v := range vehicles {
-		if v.MaxPower < powerPerVehicle {
-			assignments[v.ID] = v.MaxPower
+		amount := share
+		if v.MaxPower < amount {
+			amount = v.MaxPower
 		} else {
-			assignments[v.ID] = powerPerVehicle
+			needMore = append(needMore, v)
 		}
+		assignments[v.ID] = amount
+		remaining -= amount
 	}
+
+	for remaining > 0 && len(needMore) > 0 {
+		share = remaining / float64(len(needMore))
+		next := needMore[:0]
+		for _, v := range needMore {
+			cap := v.MaxPower - assignments[v.ID]
+			if cap <= 0 {
+				continue
+			}
+			add := share
+			if cap < add {
+				add = cap
+			}
+			assignments[v.ID] += add
+			remaining -= add
+			if assignments[v.ID] < v.MaxPower && remaining > 0 {
+				next = append(next, v)
+			}
+		}
+		if len(next) == len(needMore) {
+			break
+		}
+		needMore = next
+	}
+
 	return assignments
 }

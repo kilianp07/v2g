@@ -17,7 +17,7 @@ type Vehicle struct {
 
 // CanProvidePower returns true if the vehicle can provide the requested power in kW.
 func (v Vehicle) CanProvidePower(power float64) bool {
-	return v.IsV2G && v.Available && v.SoC > v.MinSoC && v.MaxPower >= power
+	return v.IsV2G && v.Available && v.SoC >= v.MinSoC && v.MaxPower >= power
 }
 
 // CanReduceCharge returns true if the vehicle can reduce its charging power.

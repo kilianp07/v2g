@@ -35,8 +35,8 @@ func TestEqualDispatcher_Dispatch(t *testing.T) {
 	if assignments["v1"] != 40 {
 		t.Errorf("expected 40 kW for v1 got %v", assignments["v1"])
 	}
-	if assignments["v2"] != 50 {
-		t.Errorf("expected 50 kW for v2 got %v", assignments["v2"])
+	if assignments["v2"] != 60 {
+		t.Errorf("expected 60 kW for v2 got %v", assignments["v2"])
 	}
 }
 
