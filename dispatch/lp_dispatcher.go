@@ -20,30 +20,19 @@ type lpData struct {
 	caps   []float64
 }
 
-func (d LPDispatcher) buildData(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx DispatchContext) lpData {
-	var data lpData
-	for _, v := range vehicles {
-		energy := (v.SoC - v.MinSoC) * v.BatteryKWh
-		if energy <= 0 {
-			continue
-		}
-		cap := v.MaxPower
-		if signal.Duration > 0 {
-			maxFromEnergy := energy / signal.Duration.Hours()
-			if maxFromEnergy < cap {
-				cap = maxFromEnergy
-			}
-		}
-		if cap <= 0 {
-			continue
-		}
-		data.ids = append(data.ids, v.ID)
-		data.scores = append(data.scores, d.vehicleScore(v, ctx))
-		data.caps = append(data.caps, cap)
+func (d LPDispatcher) buildData(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx *DispatchContext) lpData {
+	cands := prepareVehicles(vehicles, signal, ctx, d.vehicleScore)
+	data := lpData{ids: make([]string, len(cands)), scores: make([]float64, len(cands)), caps: make([]float64, len(cands))}
+	for i, c := range cands {
+		data.ids[i] = c.v.ID
+		data.scores[i] = c.score
+		data.caps[i] = c.capacity
 	}
 	return data
 }
 
+// solveLP runs the simplex algorithm to maximise the weighted score subject to
+// capacity constraints.
 func solveLP(scores, caps []float64, target float64) ([]float64, error) {
 	c := make([]float64, len(scores))
 	for i, s := range scores {
@@ -68,6 +57,10 @@ func solveLP(scores, caps []float64, target float64) ([]float64, error) {
 	return sol, err
 }
 
+// lpSolve points to the function used to solve the LP. It can be overridden in
+// tests to simulate solver failures.
+var lpSolve = solveLP
+
 // NewLPDispatcher returns an LP-based dispatcher with default weights.
 func NewLPDispatcher() LPDispatcher {
 	return LPDispatcher{SmartDispatcher: NewSmartDispatcher()}
@@ -82,7 +75,7 @@ func (d LPDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibilit
 		return assignments
 	}
 
-	ctx := DispatchContext{
+	ctx := &DispatchContext{
 		Signal:             signal,
 		Now:                signal.Timestamp,
 		MarketPrice:        d.MarketPrice,
@@ -100,17 +93,20 @@ func (d LPDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibilit
 		sign = -1
 	}
 
-	sol, err := solveLP(data.scores, data.caps, target)
+	sol, err := lpSolve(data.scores, data.caps, target)
 	if err != nil {
 		gd := d.SmartDispatcher
 		return gd.Dispatch(vehicles, signal)
 	}
 
-	n := len(data.scores)
 	for i, id := range data.ids {
 		power := sol[i]
-		if i+n < len(sol) {
-			power -= sol[i+n]
+		// Ensure non-negative values coming from the solver
+		if power < 0 {
+			power = 0
+		}
+		if power > data.caps[i] {
+			power = data.caps[i]
 		}
 		assignments[id] = sign * power
 	}

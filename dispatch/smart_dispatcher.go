@@ -28,26 +28,8 @@ type candidate struct {
 	capacity float64
 }
 
-func (d SmartDispatcher) buildCandidates(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx DispatchContext) []candidate {
-	var list []candidate
-	for _, v := range vehicles {
-		energy := (v.SoC - v.MinSoC) * v.BatteryKWh
-		if energy <= 0 {
-			continue
-		}
-		cap := v.MaxPower
-		if signal.Duration > 0 {
-			maxFromEnergy := energy / signal.Duration.Hours()
-			if maxFromEnergy < cap {
-				cap = maxFromEnergy
-			}
-		}
-		if cap <= 0 {
-			continue
-		}
-		list = append(list, candidate{v: v, score: d.vehicleScore(v, ctx), capacity: cap})
-	}
-	return list
+func (d SmartDispatcher) buildCandidates(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx *DispatchContext) []candidate {
+	return prepareVehicles(vehicles, signal, ctx, d.vehicleScore)
 }
 
 // NewSmartDispatcher returns a dispatcher with sensible default weights.
@@ -87,9 +69,12 @@ func (d SmartDispatcher) weightsForSignal(t model.SignalType) (float64, float64,
 }
 
 // vehicleScore computes the weighted score for a vehicle.
-func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx DispatchContext) float64 {
+func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) float64 {
 	socW, timeW, prioW, priceW, wearW, fairW := d.weightsForSignal(ctx.Signal.Type)
-	energyNorm := v.SoC - v.MinSoC
+	if v.BatteryKWh <= 0 {
+		return 0
+	}
+	energyNorm := (v.SoC - v.MinSoC) / (1 - v.MinSoC)
 	if energyNorm < 0 {
 		energyNorm = 0
 	}
@@ -101,11 +86,11 @@ func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx DispatchContext) floa
 	if minutes > 0 {
 		timeScore = math.Exp(-minutes / 30.0)
 	}
-	priority := 1.0
+	priority := 0.0
 	if v.Priority {
-		priority = 0
+		priority = 1.0
 	}
-	wear := ctx.ParticipationScore[v.ID]
+	wear := ctx.GetParticipation(v.ID)
 	score := energyNorm*socW + timeScore*timeW + priority*prioW + energyNorm*ctx.MarketPrice*priceW
 	score -= wear*wearW + wear*fairW
 	if score < 0 {
@@ -121,7 +106,7 @@ func (d SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibi
 		return assignments
 	}
 
-	ctx := DispatchContext{Signal: signal, Now: signal.Timestamp, MarketPrice: d.MarketPrice, ParticipationScore: d.Participation}
+	ctx := &DispatchContext{Signal: signal, Now: signal.Timestamp, MarketPrice: d.MarketPrice, ParticipationScore: d.Participation}
 
 	list := d.buildCandidates(vehicles, signal, ctx)
 	if len(list) == 0 {
@@ -134,11 +119,15 @@ func (d SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibi
 		sign = -1
 	}
 
+	var weightSum float64
+	for _, c := range list {
+		weightSum += c.score
+	}
+
 	rounds := 0
-	for remaining > 0 && len(list) > 0 && (d.MaxRounds == 0 || rounds < d.MaxRounds) {
+	for remaining > 0 && len(list) > 0 && weightSum > 0 && (d.MaxRounds == 0 || rounds < d.MaxRounds) {
 		var consumed float64
-		list, consumed = d.allocateRound(list, sign, remaining, assignments)
-		remaining -= consumed
+		list, weightSum, remaining, consumed = d.allocateRound(list, weightSum, sign, remaining, assignments)
 		if consumed == 0 {
 			break
 		}
@@ -147,27 +136,26 @@ func (d SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibi
 	return assignments
 }
 
-func (d SmartDispatcher) allocateRound(list []candidate, sign, remaining float64, assignments map[string]float64) ([]candidate, float64) {
-	var weightSum float64
-	for _, c := range list {
-		weightSum += c.score
-	}
-	if weightSum == 0 {
-		return nil, 0
-	}
+func (d SmartDispatcher) allocateRound(list []candidate, weightSum, sign, remaining float64, assignments map[string]float64) ([]candidate, float64, float64, float64) {
 	consumed := 0.0
 	next := list[:0]
 	for _, c := range list {
+		if remaining <= 0 || weightSum <= 0 {
+			break
+		}
 		share := remaining * (c.score / weightSum)
 		if share >= c.capacity {
 			assignments[c.v.ID] += sign * c.capacity
 			consumed += c.capacity
+			remaining -= c.capacity
+			weightSum -= c.score
 		} else {
 			assignments[c.v.ID] += sign * share
 			c.capacity -= share
 			consumed += share
+			remaining -= share
 			next = append(next, c)
 		}
 	}
-	return next, consumed
+	return next, weightSum, remaining, consumed
 }

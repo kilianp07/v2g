@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Vehicle represents an electric vehicle participating in V2X operations.
 type Vehicle struct {
@@ -14,6 +17,15 @@ type Vehicle struct {
 	Priority   bool      // whether the charging session is marked as priority
 	Departure  time.Time // planned departure time
 	MinSoC     float64   // minimum required SoC at departure
+}
+
+// Validate checks that the vehicle configuration is sound.
+// In particular BatteryKWh must be positive.
+func (v Vehicle) Validate() error {
+	if v.BatteryKWh <= 0 {
+		return fmt.Errorf("battery capacity must be positive")
+	}
+	return nil
 }
 
 // CanProvidePower returns true if the vehicle can provide the requested power in kW.
