@@ -74,7 +74,13 @@ func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) flo
 	if v.BatteryKWh <= 0 {
 		return 0
 	}
-	energyNorm := (v.SoC - v.MinSoC) / (1 - v.MinSoC)
+	var energyNorm float64
+	denom := 1 - v.MinSoC
+	if denom == 0 {
+		energyNorm = 0
+	} else {
+		energyNorm = (v.SoC - v.MinSoC) / denom
+	}
 	if energyNorm < 0 {
 		energyNorm = 0
 	}

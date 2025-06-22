@@ -27,6 +27,9 @@ func (ctx *DispatchContext) GetParticipation(id string) float64 {
 // SetParticipation safely updates the participation score for a vehicle.
 func (ctx *DispatchContext) SetParticipation(id string, score float64) {
 	ctx.mu.Lock()
+	if ctx.ParticipationScore == nil {
+		ctx.ParticipationScore = make(map[string]float64)
+	}
 	ctx.ParticipationScore[id] = score
 	ctx.mu.Unlock()
 }
