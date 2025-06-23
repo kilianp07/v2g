@@ -14,6 +14,7 @@ import (
 	"github.com/kilianp07/v2g/dispatch"
 	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/metrics"
+	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
 )
 
@@ -87,7 +88,13 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
 	}
-	_ = manager
+
+	signals := make(chan model.FlexibilitySignal, 1)
+	vehicles := []model.Vehicle{}
+	go manager.Run(ctx, signals, vehicles)
+
+	// send an initial dummy signal so the service does some work
+	signals <- model.FlexibilitySignal{Type: model.SignalFCR, Timestamp: time.Now()}
 
 	<-ctx.Done()
 	return nil

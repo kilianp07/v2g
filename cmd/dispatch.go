@@ -59,7 +59,13 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 
 	veh := model.Vehicle{ID: "test", IsV2G: true, Available: true, MaxPower: 10, BatteryKWh: 40, SoC: 0.8}
 	sig := model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 5, Duration: time.Minute, Timestamp: time.Now()}
-	manager.Dispatch(sig, []model.Vehicle{veh})
+	res := manager.Dispatch(sig, []model.Vehicle{veh})
+	if len(res.Errors) > 0 {
+		for id, derr := range res.Errors {
+			logg.Errorf("dispatch %s failed: %v", id, derr)
+		}
+		return fmt.Errorf("dispatch encountered errors")
+	}
 
 	<-ctx.Done()
 	return nil

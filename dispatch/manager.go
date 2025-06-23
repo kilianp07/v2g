@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -19,6 +20,20 @@ type DispatchManager struct {
 	ackTimeout time.Duration
 	logger     logger.Logger
 	metrics    metrics.MetricsSink
+}
+
+// Run processes incoming flexibility signals until the context is canceled.
+// For each signal received on the channel, Dispatch is invoked with the
+// provided list of vehicles.
+func (m *DispatchManager) Run(ctx context.Context, signals <-chan model.FlexibilitySignal, vehicles []model.Vehicle) {
+	for {
+		select {
+		case sig := <-signals:
+			m.Dispatch(sig, vehicles)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // sendAndWait sends the command and waits for an acknowledgment while measuring
