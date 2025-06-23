@@ -8,6 +8,9 @@ type DispatchResult struct {
 	FallbackAssignments map[string]float64 // reallocation if some vehicles fail
 	Errors              map[string]error
 	Acknowledged        map[string]bool
+	Signal              model.FlexibilitySignal
+	MarketPrice         float64
+	Scores              map[string]float64
 }
 
 // Dispatcher defines how power is distributed between vehicles.
@@ -23,4 +26,14 @@ type VehicleFilter interface {
 // FallbackStrategy reallocates power in case of failures.
 type FallbackStrategy interface {
 	Reallocate(failed []model.Vehicle, current map[string]float64, signal model.FlexibilitySignal) map[string]float64
+}
+
+// ScoringDispatcher optionally exposes per-vehicle scores after dispatch.
+type ScoringDispatcher interface {
+	GetScores() map[string]float64
+}
+
+// MarketPriceProvider exposes the current market price used by the dispatcher.
+type MarketPriceProvider interface {
+	GetMarketPrice() float64
 }

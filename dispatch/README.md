@@ -12,6 +12,7 @@ manager, err := dispatch.NewDispatchManager(
     mqtt.NewMockPublisher(),
     5*time.Second,
     logger.New("dispatch"),
+    metrics.NopSink{},
 )
 ```
 

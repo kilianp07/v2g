@@ -20,3 +20,21 @@ type FlexibilitySignal struct {
 	Duration  time.Duration // duration of the signal
 	Timestamp time.Time     // time at which signal was received
 }
+
+// String returns a human-readable representation of the signal type.
+func (t SignalType) String() string {
+	switch t {
+	case SignalFCR:
+		return "FCR"
+	case SignalAFRR:
+		return "aFRR"
+	case SignalMA:
+		return "MA"
+	case SignalNEBEF:
+		return "NEBEF"
+	case SignalEcoWatt:
+		return "EcoWatt"
+	default:
+		return "unknown"
+	}
+}

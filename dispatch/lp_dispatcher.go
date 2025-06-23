@@ -69,7 +69,7 @@ func NewLPDispatcher() LPDispatcher {
 // Dispatch implements the Dispatcher interface. It solves
 // a linear program maximizing the weighted score while meeting
 // the power target.
-func (d LPDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
+func (d *LPDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
 	assignments := make(map[string]float64)
 	if len(vehicles) == 0 || signal.PowerKW == 0 {
 		return assignments
@@ -83,6 +83,10 @@ func (d LPDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibilit
 	}
 
 	data := d.buildData(vehicles, signal, ctx)
+	d.scores = make(map[string]float64, len(data.ids))
+	for i, id := range data.ids {
+		d.scores[id] = data.scores[i]
+	}
 	if len(data.ids) == 0 {
 		return assignments
 	}
@@ -111,4 +115,13 @@ func (d LPDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibilit
 		assignments[id] = sign * power
 	}
 	return assignments
+}
+
+// GetScores returns the last computed scores for vehicles.
+func (d *LPDispatcher) GetScores() map[string]float64 {
+	cp := make(map[string]float64, len(d.scores))
+	for k, v := range d.scores {
+		cp[k] = v
+	}
+	return cp
 }

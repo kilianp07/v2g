@@ -20,6 +20,7 @@ type SmartDispatcher struct {
 	MarketPrice    float64
 	Participation  map[string]float64
 	MaxRounds      int
+	scores         map[string]float64
 }
 
 type candidate struct {
@@ -43,6 +44,7 @@ func NewSmartDispatcher() SmartDispatcher {
 		FairnessWeight: 0.05,
 		Participation:  make(map[string]float64),
 		MaxRounds:      10,
+		scores:         make(map[string]float64),
 	}
 }
 
@@ -106,7 +108,7 @@ func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) flo
 }
 
 // Dispatch implements the Dispatcher interface using the greedy weighted scores.
-func (d SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
+func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
 	assignments := make(map[string]float64)
 	if len(vehicles) == 0 || signal.PowerKW == 0 {
 		return assignments
@@ -115,6 +117,10 @@ func (d SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexibi
 	ctx := &DispatchContext{Signal: signal, Now: signal.Timestamp, MarketPrice: d.MarketPrice, ParticipationScore: d.Participation}
 
 	list := d.buildCandidates(vehicles, signal, ctx)
+	d.scores = make(map[string]float64, len(list))
+	for _, c := range list {
+		d.scores[c.v.ID] = c.score
+	}
 	if len(list) == 0 {
 		return assignments
 	}
@@ -164,4 +170,18 @@ func (d SmartDispatcher) allocateRound(list []candidate, weightSum, sign, remain
 		}
 	}
 	return next, weightSum, remaining, consumed
+}
+
+// GetScores implements ScoringDispatcher by returning the last computed scores.
+func (d *SmartDispatcher) GetScores() map[string]float64 {
+	cp := make(map[string]float64, len(d.scores))
+	for k, v := range d.scores {
+		cp[k] = v
+	}
+	return cp
+}
+
+// GetMarketPrice implements MarketPriceProvider by returning the configured market price.
+func (d *SmartDispatcher) GetMarketPrice() float64 {
+	return d.MarketPrice
 }

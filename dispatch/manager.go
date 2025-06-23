@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kilianp07/v2g/logger"
+	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
 )
@@ -17,12 +18,13 @@ type DispatchManager struct {
 	publisher  mqtt.Client
 	ackTimeout time.Duration
 	logger     logger.Logger
+	metrics    metrics.MetricsSink
 }
 
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, log logger.Logger) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, log logger.Logger, sink metrics.MetricsSink) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
@@ -39,6 +41,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		publisher:  publisher,
 		ackTimeout: ackTimeout,
 		logger:     log,
+		metrics:    sink,
 	}, nil
 }
 
@@ -52,9 +55,16 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		Assignments:  make(map[string]float64, len(assignments)),
 		Errors:       make(map[string]error),
 		Acknowledged: make(map[string]bool),
+		Scores:       make(map[string]float64),
 	}
 	for id, p := range assignments {
 		result.Assignments[id] = p
+	}
+
+	if sd, ok := m.dispatcher.(ScoringDispatcher); ok {
+		for id, s := range sd.GetScores() {
+			result.Scores[id] = s
+		}
 	}
 
 	var wg sync.WaitGroup
@@ -94,6 +104,27 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	if len(failed) > 0 {
 		m.logger.Warnf("%d vehicles failed, reallocating", len(failed))
 		result.FallbackAssignments = m.fallback.Reallocate(failed, result.Assignments, signal)
+	}
+	result.Signal = signal
+	if mp, ok := m.dispatcher.(MarketPriceProvider); ok {
+		result.MarketPrice = mp.GetMarketPrice()
+	}
+	if m.metrics != nil {
+		var recs []metrics.DispatchResult
+		for vid, p := range result.Assignments {
+			recs = append(recs, metrics.DispatchResult{
+				Signal:       result.Signal,
+				VehicleID:    vid,
+				PowerKW:      p,
+				Score:        result.Scores[vid],
+				MarketPrice:  result.MarketPrice,
+				Acknowledged: result.Acknowledged[vid],
+				DispatchTime: signal.Timestamp,
+			})
+		}
+		if err := m.metrics.RecordDispatchResult(recs); err != nil {
+			m.logger.Errorf("metrics error: %v", err)
+		}
 	}
 	return result
 }
