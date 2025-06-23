@@ -1,0 +1,101 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/kilianp07/v2g/config"
+	"github.com/kilianp07/v2g/dispatch"
+	"github.com/kilianp07/v2g/logger"
+	"github.com/kilianp07/v2g/metrics"
+	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/mqtt"
+)
+
+var cfgPath string
+
+var rootCmd = &cobra.Command{
+	Use:   "v2g",
+	Short: "V2G dispatch service",
+	RunE:  run,
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "configuration file")
+}
+
+// Execute runs the CLI.
+func Execute() error { return rootCmd.Execute() }
+
+func run(cmd *cobra.Command, args []string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logg := logger.New("main")
+	metricsLogger := logger.New("metrics")
+	mqttCfg := cfg.MQTT
+	mqttCfg.Logger = logg
+	client, err := mqtt.NewPahoClient(mqttCfg)
+	if err != nil {
+		return fmt.Errorf("mqtt client: %w", err)
+	}
+
+	var sinks []metrics.MetricsSink
+	if cfg.Metrics.PrometheusEnabled {
+		sink, err := metrics.NewPromSink(cfg.Metrics)
+		if err != nil {
+			return fmt.Errorf("prom sink: %w", err)
+		}
+		sinks = append(sinks, sink)
+		go func() {
+			if err := metrics.StartPromServer(ctx, cfg.Metrics.PrometheusPort); err != nil {
+				logg.Errorf("prom server: %v", err)
+			}
+		}()
+	}
+	if cfg.Metrics.InfluxEnabled {
+		sink := metrics.NewInfluxSinkWithFallback(cfg.Metrics, metricsLogger)
+		sinks = append(sinks, sink)
+	}
+	var sink metrics.MetricsSink = metrics.NopSink{}
+	if len(sinks) == 1 {
+		sink = sinks[0]
+	} else if len(sinks) > 1 {
+		sink = metrics.NewMultiSink(sinks...)
+	}
+
+	ackTimeout := time.Duration(cfg.Dispatch.AckTimeoutSeconds) * time.Second
+	manager, err := dispatch.NewDispatchManager(
+		dispatch.SimpleVehicleFilter{},
+		dispatch.EqualDispatcher{},
+		dispatch.NoopFallback{},
+		client,
+		ackTimeout,
+		logg,
+		sink,
+	)
+	if err != nil {
+		return fmt.Errorf("dispatch manager: %w", err)
+	}
+
+	signals := make(chan model.FlexibilitySignal, 1)
+	vehicles := []model.Vehicle{}
+	go manager.Run(ctx, signals, vehicles)
+
+	// send an initial dummy signal so the service does some work
+	signals <- model.FlexibilitySignal{Type: model.SignalFCR, Timestamp: time.Now()}
+
+	<-ctx.Done()
+	return nil
+}
