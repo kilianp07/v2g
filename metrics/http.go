@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -18,7 +19,9 @@ func StartPromServer(ctx context.Context, addr string) error {
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		_ = srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("prom server shutdown: %v", err)
+		}
 		cancel()
 	}()
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

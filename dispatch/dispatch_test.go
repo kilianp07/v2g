@@ -55,7 +55,10 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 	if errSink != nil {
 		t.Fatalf("prom sink: %v", errSink)
 	}
-	promSink := sinkIf.(*metrics.PromSink)
+	promSink, ok := sinkIf.(*metrics.PromSink)
+	if !ok {
+		t.Fatalf("expected PromSink")
+	}
 	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{}, promSink)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -17,7 +17,10 @@ func TestPromSink_RecordDispatchResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create sink: %v", err)
 	}
-	sink := sinkIf.(*PromSink)
+	sink, ok := sinkIf.(*PromSink)
+	if !ok {
+		t.Fatalf("expected PromSink")
+	}
 	now := time.Now()
 	rec := DispatchResult{
 		Signal:       model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: now},
