@@ -12,7 +12,8 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
 
-	"github.com/kilianp07/v2g/logger"
+	"github.com/rs/zerolog"
+
 	"github.com/kilianp07/v2g/model"
 )
 
@@ -20,13 +21,14 @@ import (
 type InfluxSink struct {
 	client   influxdb2.Client
 	writeAPI api.WriteAPIBlocking
-	log      logger.Logger
+	log      *zerolog.Logger
 }
 
 // NewInfluxSink creates a new sink configured for the given InfluxDB endpoint.
-func NewInfluxSink(url, token, org, bucket string, l logger.Logger) *InfluxSink {
+func NewInfluxSink(url, token, org, bucket string, l *zerolog.Logger) *InfluxSink {
 	if l == nil {
-		l = logger.NopLogger{}
+		nop := zerolog.Nop()
+		l = &nop
 	}
 	base := strings.TrimSuffix(url, "/api/v2/write")
 	client := influxdb2.NewClientWithOptions(base, token,
@@ -40,16 +42,16 @@ func NewInfluxSink(url, token, org, bucket string, l logger.Logger) *InfluxSink 
 
 // NewInfluxSinkWithFallback tries to ping the InfluxDB instance and
 // returns a NopSink if the health check fails.
-func NewInfluxSinkWithFallback(url, token, org, bucket string, l logger.Logger) MetricsSink {
-	sink := NewInfluxSink(url, token, org, bucket, l)
+func NewInfluxSinkWithFallback(cfg Config, l *zerolog.Logger) MetricsSink {
+	sink := NewInfluxSink(cfg.InfluxURL, cfg.InfluxToken, cfg.InfluxOrg, cfg.InfluxBucket, l)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	health, err := sink.client.Health(ctx)
 	if err != nil || health.Status != "pass" {
 		if err != nil {
-			sink.log.Errorf("influx health check error: %v", err)
+			sink.log.Error().Msgf("influx health check error: %v", err)
 		} else {
-			sink.log.Errorf("influx health status: %s", health.Status)
+			sink.log.Error().Msgf("influx health status: %s", health.Status)
 		}
 		sink.client.Close()
 		return NopSink{}

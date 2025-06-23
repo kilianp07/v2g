@@ -12,10 +12,15 @@ type PromSink struct {
 	latency *prometheus.HistogramVec
 }
 
-// NewPromSink registers dispatch metrics on the provided Prometheus registerer.
-// If reg is nil, the default registerer is used. If the collectors are already
-// registered, the existing ones are reused.
-func NewPromSink(reg prometheus.Registerer) (*PromSink, error) {
+// NewPromSink registers dispatch metrics on the default Prometheus registerer.
+// The Prometheus server should be started separately using cfg.PrometheusPort.
+func NewPromSink(cfg Config) (MetricsSink, error) {
+	return NewPromSinkWithRegistry(cfg, prometheus.DefaultRegisterer)
+}
+
+// NewPromSinkWithRegistry registers metrics on the provided registerer.
+// A nil registerer defaults to the global Prometheus registerer.
+func NewPromSinkWithRegistry(cfg Config, reg prometheus.Registerer) (MetricsSink, error) {
 	if reg == nil {
 		reg = prometheus.DefaultRegisterer
 	}

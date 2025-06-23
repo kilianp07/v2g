@@ -46,6 +46,8 @@ sink := metrics.NewMultiSink(prom, influx)
 Expose the metrics with:
 
 ```go
-go metrics.StartPromServer(":2112")
+ctx := context.Background()
+go metrics.StartPromServer(ctx, ":2112")
 ```
-// StartPromServer uses its own ServeMux and the default Prometheus registry.
+// StartPromServer uses its own ServeMux and the default Prometheus registry and
+// stops when the context is canceled.

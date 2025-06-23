@@ -10,7 +10,6 @@ import (
 
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
 
-	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/model"
 )
 
@@ -23,7 +22,7 @@ func TestInfluxSink_RecordDispatchResult(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	sink := NewInfluxSink(srv.URL, "token", "org", "bucket", logger.NopLogger{})
+	sink := NewInfluxSink(srv.URL, "token", "org", "bucket", nil)
 	now := time.Now()
 	rec := DispatchResult{
 		Signal:       model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: now},
@@ -64,7 +63,13 @@ func TestNewInfluxSinkWithFallback(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	sink := NewInfluxSinkWithFallback(srv.URL+"/api/v2/write", "tok", "org", "bucket", logger.NopLogger{})
+	cfg := Config{
+		InfluxURL:    srv.URL + "/api/v2/write",
+		InfluxToken:  "tok",
+		InfluxOrg:    "org",
+		InfluxBucket: "bucket",
+	}
+	sink := NewInfluxSinkWithFallback(cfg, nil)
 	if _, ok := sink.(*InfluxSink); ok {
 		t.Fatalf("expected NopSink on failing health check")
 	}

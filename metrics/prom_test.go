@@ -13,9 +13,13 @@ import (
 
 func TestPromSink_RecordDispatchResult(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	sink, err := NewPromSink(reg)
+	sinkIf, err := NewPromSinkWithRegistry(Config{}, reg)
 	if err != nil {
 		t.Fatalf("create sink: %v", err)
+	}
+	sink, ok := sinkIf.(*PromSink)
+	if !ok {
+		t.Fatalf("expected PromSink")
 	}
 	now := time.Now()
 	rec := DispatchResult{
