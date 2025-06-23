@@ -26,3 +26,19 @@ type MetricsSink interface {
 type NopSink struct{}
 
 func (NopSink) RecordDispatchResult([]DispatchResult) error { return nil }
+
+// DispatchLatency represents the time to receive an acknowledgment for an order.
+type DispatchLatency struct {
+	VehicleID    string
+	Signal       model.SignalType
+	Acknowledged bool
+	Latency      time.Duration
+}
+
+// LatencyRecorder is implemented by sinks able to record dispatch latency.
+type LatencyRecorder interface {
+	RecordDispatchLatency(latencies []DispatchLatency) error
+}
+
+// Ensure NopSink implements LatencyRecorder.
+func (NopSink) RecordDispatchLatency([]DispatchLatency) error { return nil }
