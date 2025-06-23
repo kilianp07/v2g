@@ -1,7 +1,10 @@
 mqtt:
-  broker_url: "tcp://localhost:1883"
+  broker: "tcp://localhost:1883"
   client_id: "v2g-dispatcher"
-  tls_enabled: false
+  username: ""
+  password: ""
+  ack_topic: "vehicle/+/ack"
+  use_tls: false
 dispatch:
   ack_timeout_seconds: 5
 metrics:
