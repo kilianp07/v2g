@@ -11,6 +11,9 @@ Go 1.20 or later is required.
 go test ./...
 ```
 
+Copy `config.example.yaml` to `config.yaml` and adjust the MQTT credentials to
+match your broker.
+
 ## Packages
 
 - **model**: domain objects such as `Vehicle` and `FlexibilitySignal`.
