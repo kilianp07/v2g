@@ -106,8 +106,8 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		result.FallbackAssignments = m.fallback.Reallocate(failed, result.Assignments, signal)
 	}
 	result.Signal = signal
-	if sd, ok := m.dispatcher.(*SmartDispatcher); ok {
-		result.MarketPrice = sd.MarketPrice
+	if mp, ok := m.dispatcher.(MarketPriceProvider); ok {
+		result.MarketPrice = mp.GetMarketPrice()
 	}
 	if m.metrics != nil {
 		var recs []metrics.DispatchResult
@@ -119,7 +119,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 				Score:        result.Scores[vid],
 				MarketPrice:  result.MarketPrice,
 				Acknowledged: result.Acknowledged[vid],
-				DispatchTime: time.Now(),
+				DispatchTime: signal.Timestamp,
 			})
 		}
 		if err := m.metrics.RecordDispatchResult(recs); err != nil {

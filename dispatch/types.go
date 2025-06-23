@@ -32,3 +32,8 @@ type FallbackStrategy interface {
 type ScoringDispatcher interface {
 	GetScores() map[string]float64
 }
+
+// MarketPriceProvider exposes the current market price used by the dispatcher.
+type MarketPriceProvider interface {
+	GetMarketPrice() float64
+}

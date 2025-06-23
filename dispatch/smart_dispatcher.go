@@ -180,3 +180,8 @@ func (d *SmartDispatcher) GetScores() map[string]float64 {
 	}
 	return cp
 }
+
+// GetMarketPrice implements MarketPriceProvider by returning the configured market price.
+func (d *SmartDispatcher) GetMarketPrice() float64 {
+	return d.MarketPrice
+}

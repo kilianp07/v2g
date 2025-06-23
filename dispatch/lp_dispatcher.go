@@ -12,7 +12,6 @@ import (
 // according to SmartDispatcher scores.
 type LPDispatcher struct {
 	SmartDispatcher
-	scores map[string]float64
 }
 
 type lpData struct {
@@ -64,7 +63,7 @@ var lpSolve = solveLP
 
 // NewLPDispatcher returns an LP-based dispatcher with default weights.
 func NewLPDispatcher() LPDispatcher {
-	return LPDispatcher{SmartDispatcher: NewSmartDispatcher(), scores: make(map[string]float64)}
+	return LPDispatcher{SmartDispatcher: NewSmartDispatcher()}
 }
 
 // Dispatch implements the Dispatcher interface. It solves

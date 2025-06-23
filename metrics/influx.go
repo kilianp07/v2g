@@ -42,7 +42,8 @@ func NewInfluxSink(url, token, org, bucket string, l logger.Logger) *InfluxSink 
 // returns a NopSink if the health check fails.
 func NewInfluxSinkWithFallback(url, token, org, bucket string, l logger.Logger) MetricsSink {
 	sink := NewInfluxSink(url, token, org, bucket, l)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	health, err := sink.client.Health(ctx)
 	if err != nil || health.Status != "pass" {
 		if err != nil {
@@ -58,10 +59,8 @@ func NewInfluxSinkWithFallback(url, token, org, bucket string, l logger.Logger) 
 
 // RecordDispatchResult writes the dispatch result as line protocol events.
 func (s *InfluxSink) RecordDispatchResult(res []DispatchResult) error {
-	if s == nil {
-		return nil
-	}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	for _, r := range res {
 		p := write.NewPointWithMeasurement("dispatch_event").
 			AddTag("vehicle_id", r.VehicleID).
