@@ -15,7 +15,15 @@ type PromSink struct {
 // NewPromSink registers dispatch metrics on the default Prometheus registerer.
 // The Prometheus server should be started separately using cfg.PrometheusPort.
 func NewPromSink(cfg Config) (MetricsSink, error) {
-	reg := prometheus.DefaultRegisterer
+	return NewPromSinkWithRegistry(cfg, prometheus.DefaultRegisterer)
+}
+
+// NewPromSinkWithRegistry registers metrics on the provided registerer.
+// A nil registerer defaults to the global Prometheus registerer.
+func NewPromSinkWithRegistry(cfg Config, reg prometheus.Registerer) (MetricsSink, error) {
+	if reg == nil {
+		reg = prometheus.DefaultRegisterer
+	}
 	events := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "dispatch_events_total",
 		Help: "Total number of dispatch events",

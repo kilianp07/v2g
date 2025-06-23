@@ -51,15 +51,7 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 	}
 	publisher := mqtt.NewMockPublisher()
 	reg := prometheus.NewRegistry()
-	oldReg := prometheus.DefaultRegisterer
-	oldGather := prometheus.DefaultGatherer
-	prometheus.DefaultRegisterer = reg
-	prometheus.DefaultGatherer = reg
-	defer func() {
-		prometheus.DefaultRegisterer = oldReg
-		prometheus.DefaultGatherer = oldGather
-	}()
-	sinkIf, errSink := metrics.NewPromSink(metrics.Config{})
+	sinkIf, errSink := metrics.NewPromSinkWithRegistry(metrics.Config{}, reg)
 	if errSink != nil {
 		t.Fatalf("prom sink: %v", errSink)
 	}

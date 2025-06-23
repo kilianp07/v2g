@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -15,6 +18,9 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Fatalf("load config: %v", err)
@@ -37,7 +43,7 @@ func main() {
 		}
 		sinks = append(sinks, sink)
 		go func() {
-			if err := metrics.StartPromServer(cfg.Metrics.PrometheusPort); err != nil {
+			if err := metrics.StartPromServer(ctx, cfg.Metrics.PrometheusPort); err != nil {
 				logg.Errorf("prom server: %v", err)
 			}
 		}()
@@ -54,7 +60,7 @@ func main() {
 	}
 
 	ackTimeout := time.Duration(cfg.Dispatch.AckTimeoutSeconds) * time.Second
-	_, err = dispatch.NewDispatchManager(
+	manager, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
 		dispatch.EqualDispatcher{},
 		dispatch.NoopFallback{},
@@ -66,4 +72,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("dispatch manager: %v", err)
 	}
+	_ = manager
+
+	<-ctx.Done()
 }

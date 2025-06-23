@@ -13,15 +13,7 @@ import (
 
 func TestPromSink_RecordDispatchResult(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	oldReg := prometheus.DefaultRegisterer
-	oldGather := prometheus.DefaultGatherer
-	prometheus.DefaultRegisterer = reg
-	prometheus.DefaultGatherer = reg
-	defer func() {
-		prometheus.DefaultRegisterer = oldReg
-		prometheus.DefaultGatherer = oldGather
-	}()
-	sinkIf, err := NewPromSink(Config{})
+	sinkIf, err := NewPromSinkWithRegistry(Config{}, reg)
 	if err != nil {
 		t.Fatalf("create sink: %v", err)
 	}
