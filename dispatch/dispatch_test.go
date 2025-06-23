@@ -4,7 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/kilianp07/v2g/logger"
+	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
 )
@@ -47,7 +50,12 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 		{ID: "v2", SoC: 0.7, IsV2G: true, Available: true, MaxPower: 50},
 	}
 	publisher := mqtt.NewMockPublisher()
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{}, nil)
+	reg := prometheus.NewRegistry()
+	promSink, errSink := metrics.NewPromSink(reg)
+	if errSink != nil {
+		t.Fatalf("prom sink: %v", errSink)
+	}
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{}, promSink)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

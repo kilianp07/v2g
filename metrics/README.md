@@ -26,3 +26,26 @@ from(bucket: "v2g")
   |> range(start: -1d)
   |> filter(fn: (r) => r._measurement == "dispatch_event" and r.signal_type == "FCR")
 ```
+
+`PromSink` offers a Prometheus alternative. Use `NewPromSink` to register both a
+`dispatch_events_total` counter and a `dispatch_latency_seconds` histogram on a
+given registry (the default registry is used when `nil` is provided). The
+function returns an error if registration fails. Each dispatch result increments
+the counter with labels `vehicle_id`, `signal_type` and `acknowledged`. Latency
+between command send and acknowledgment is observed with the same labels.
+
+When using multiple sinks (e.g. Prometheus and InfluxDB) you can combine them
+with `NewMultiSink`:
+
+```go
+prom, _ := metrics.NewPromSink(nil)
+influx := metrics.NewInfluxSink("http://influx:8086", "token", "org", "bucket", nil)
+sink := metrics.NewMultiSink(prom, influx)
+```
+
+Expose the metrics with:
+
+```go
+go metrics.StartPromServer(":2112")
+```
+// StartPromServer uses its own ServeMux and the default Prometheus registry.

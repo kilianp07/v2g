@@ -21,6 +21,19 @@ type DispatchManager struct {
 	metrics    metrics.MetricsSink
 }
 
+// sendAndWait sends the command and waits for an acknowledgment while measuring
+// the latency.
+
+func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Duration, error) {
+	start := time.Now()
+	cmdID, err := m.publisher.SendOrder(id, power)
+	if err != nil {
+		return false, time.Since(start), err
+	}
+	ack, err := m.publisher.WaitForAck(cmdID, m.ackTimeout)
+	return ack, time.Since(start), err
+}
+
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
@@ -67,64 +80,92 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		}
 	}
 
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	update := func(id string, ack bool, err error) {
-		mu.Lock()
-		defer mu.Unlock()
-		if err != nil {
-			result.Errors[id] = err
-		}
-		result.Acknowledged[id] = err == nil && ack
-	}
-	for id, power := range result.Assignments {
-		id := id
-		power := power
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			cmdID, err := m.publisher.SendOrder(id, power)
-			if err == nil {
-				var ok bool
-				ok, err = m.publisher.WaitForAck(cmdID, m.ackTimeout)
-				update(id, ok, err)
-			} else {
-				update(id, false, err)
-			}
-		}()
-	}
-	wg.Wait()
+	lr, recordLatency := m.metrics.(metrics.LatencyRecorder)
+	latencies := m.dispatchAssignments(&result, signal, recordLatency)
 
-	var failed []model.Vehicle
-	for _, v := range filtered {
-		if !result.Acknowledged[v.ID] {
-			failed = append(failed, v)
-		}
-	}
+	failed := m.unacknowledged(filtered, result.Acknowledged)
 	if len(failed) > 0 {
 		m.logger.Warnf("%d vehicles failed, reallocating", len(failed))
 		result.FallbackAssignments = m.fallback.Reallocate(failed, result.Assignments, signal)
 	}
+
 	result.Signal = signal
 	if mp, ok := m.dispatcher.(MarketPriceProvider); ok {
 		result.MarketPrice = mp.GetMarketPrice()
 	}
-	if m.metrics != nil {
-		var recs []metrics.DispatchResult
-		for vid, p := range result.Assignments {
-			recs = append(recs, metrics.DispatchResult{
-				Signal:       result.Signal,
-				VehicleID:    vid,
-				PowerKW:      p,
-				Score:        result.Scores[vid],
-				MarketPrice:  result.MarketPrice,
-				Acknowledged: result.Acknowledged[vid],
-				DispatchTime: signal.Timestamp,
+	m.recordMetrics(result, latencies, lr, recordLatency)
+	return result
+}
+
+// dispatchAssignments publishes the orders concurrently and records acknowledgments.
+func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.FlexibilitySignal, recordLatency bool) []metrics.DispatchLatency {
+	var (
+		wg  sync.WaitGroup
+		mu  sync.Mutex
+		lat []metrics.DispatchLatency
+	)
+	update := func(id string, ack bool, err error, dur time.Duration) {
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			res.Errors[id] = err
+		}
+		res.Acknowledged[id] = err == nil && ack
+		if recordLatency {
+			lat = append(lat, metrics.DispatchLatency{
+				VehicleID:    id,
+				Signal:       signal.Type,
+				Acknowledged: err == nil && ack,
+				Latency:      dur,
 			})
 		}
-		if err := m.metrics.RecordDispatchResult(recs); err != nil {
-			m.logger.Errorf("metrics error: %v", err)
+	}
+	for id, power := range res.Assignments {
+		wg.Add(1)
+		go func(id string, p float64) {
+			defer wg.Done()
+			ack, d, err := m.sendAndWait(id, p)
+			update(id, ack, err, d)
+		}(id, power)
+	}
+	wg.Wait()
+	return lat
+}
+
+// unacknowledged returns the subset of vehicles that did not acknowledge.
+func (m *DispatchManager) unacknowledged(all []model.Vehicle, acks map[string]bool) []model.Vehicle {
+	var failed []model.Vehicle
+	for _, v := range all {
+		if !acks[v.ID] {
+			failed = append(failed, v)
 		}
 	}
-	return result
+	return failed
+}
+
+// recordMetrics persists dispatch metrics if a sink is configured.
+func (m *DispatchManager) recordMetrics(res DispatchResult, lat []metrics.DispatchLatency, lr metrics.LatencyRecorder, hasLatency bool) {
+	if m.metrics == nil {
+		return
+	}
+	var recs []metrics.DispatchResult
+	for vid, p := range res.Assignments {
+		recs = append(recs, metrics.DispatchResult{
+			Signal:       res.Signal,
+			VehicleID:    vid,
+			PowerKW:      p,
+			Score:        res.Scores[vid],
+			MarketPrice:  res.MarketPrice,
+			Acknowledged: res.Acknowledged[vid],
+			DispatchTime: res.Signal.Timestamp,
+		})
+	}
+	if err := m.metrics.RecordDispatchResult(recs); err != nil {
+		m.logger.Errorf("metrics error: %v", err)
+	}
+	if hasLatency && lr != nil {
+		if err := lr.RecordDispatchLatency(lat); err != nil {
+			m.logger.Errorf("latency metrics error: %v", err)
+		}
+	}
 }
