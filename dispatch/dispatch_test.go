@@ -51,10 +51,19 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 	}
 	publisher := mqtt.NewMockPublisher()
 	reg := prometheus.NewRegistry()
-	promSink, errSink := metrics.NewPromSink(reg)
+	oldReg := prometheus.DefaultRegisterer
+	oldGather := prometheus.DefaultGatherer
+	prometheus.DefaultRegisterer = reg
+	prometheus.DefaultGatherer = reg
+	defer func() {
+		prometheus.DefaultRegisterer = oldReg
+		prometheus.DefaultGatherer = oldGather
+	}()
+	sinkIf, errSink := metrics.NewPromSink(metrics.Config{})
 	if errSink != nil {
 		t.Fatalf("prom sink: %v", errSink)
 	}
+	promSink := sinkIf.(*metrics.PromSink)
 	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{}, promSink)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

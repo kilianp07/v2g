@@ -1,0 +1,52 @@
+package config
+
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	"github.com/knadh/koanf/parsers/json"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
+
+	"github.com/kilianp07/v2g/dispatch"
+	"github.com/kilianp07/v2g/metrics"
+	"github.com/kilianp07/v2g/mqtt"
+)
+
+type Config struct {
+	MQTT     mqtt.Config     `json:"mqtt"`
+	Dispatch dispatch.Config `json:"dispatch"`
+	Metrics  metrics.Config  `json:"metrics"`
+}
+
+func Load(path string) (*Config, error) {
+	k := koanf.New(".")
+	ext := strings.ToLower(filepath.Ext(path))
+	var parser koanf.Parser
+	switch ext {
+	case ".yaml", ".yml":
+		parser = yaml.Parser()
+	case ".json":
+		parser = json.Parser()
+	default:
+		return nil, fmt.Errorf("unsupported config format: %s", ext)
+	}
+	if err := k.Load(file.Provider(path), parser); err != nil {
+		return nil, err
+	}
+	// Optional environment overrides
+	if err := k.Load(env.Provider("K_", "__", func(s string) string {
+		s = strings.TrimPrefix(strings.ToLower(s), "k_")
+		return strings.ReplaceAll(s, "__", ".")
+	}), nil); err != nil {
+		return nil, err
+	}
+	var cfg Config
+	if err := k.Unmarshal("", &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}

@@ -13,10 +13,19 @@ import (
 
 func TestPromSink_RecordDispatchResult(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	sink, err := NewPromSink(reg)
+	oldReg := prometheus.DefaultRegisterer
+	oldGather := prometheus.DefaultGatherer
+	prometheus.DefaultRegisterer = reg
+	prometheus.DefaultGatherer = reg
+	defer func() {
+		prometheus.DefaultRegisterer = oldReg
+		prometheus.DefaultGatherer = oldGather
+	}()
+	sinkIf, err := NewPromSink(Config{})
 	if err != nil {
 		t.Fatalf("create sink: %v", err)
 	}
+	sink := sinkIf.(*PromSink)
 	now := time.Now()
 	rec := DispatchResult{
 		Signal:       model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: now},

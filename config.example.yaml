@@ -1,0 +1,14 @@
+mqtt:
+  broker_url: "tcp://localhost:1883"
+  client_id: "v2g-dispatcher"
+  tls_enabled: false
+dispatch:
+  ack_timeout_seconds: 5
+metrics:
+  prometheus_enabled: true
+  prometheus_port: ":2112"
+  influx_enabled: true
+  influx_url: "http://influxdb:8086"
+  influx_token: "secret"
+  influx_org: "my-org"
+  influx_bucket: "v2g"
