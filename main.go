@@ -8,8 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/dispatch"
 	"github.com/kilianp07/v2g/logger"
@@ -27,7 +25,7 @@ func main() {
 	}
 
 	logg := logger.New("main")
-	zlog := zerolog.New(os.Stdout).With().Timestamp().Str("component", "metrics").Logger()
+	metricsLogger := logger.New("metrics")
 	mqttCfg := cfg.MQTT
 	mqttCfg.Logger = logg
 	client, err := mqtt.NewPahoClient(mqttCfg)
@@ -49,7 +47,7 @@ func main() {
 		}()
 	}
 	if cfg.Metrics.InfluxEnabled {
-		sink := metrics.NewInfluxSinkWithFallback(cfg.Metrics, &zlog)
+		sink := metrics.NewInfluxSinkWithFallback(cfg.Metrics, metricsLogger)
 		sinks = append(sinks, sink)
 	}
 	var sink metrics.MetricsSink = metrics.NopSink{}
