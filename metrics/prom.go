@@ -12,25 +12,39 @@ type PromSink struct {
 	latency *prometheus.HistogramVec
 }
 
-// NewPromSink registers a dispatch_events_total counter on the provided
-// Prometheus Registerer. If reg is nil, the default registry is used.
-func NewPromSink(reg prometheus.Registerer) *PromSink {
+// NewPromSink registers dispatch metrics on the provided Prometheus registerer.
+// If reg is nil, the default registerer is used. If the collectors are already
+// registered, the existing ones are reused.
+func NewPromSink(reg prometheus.Registerer) (*PromSink, error) {
 	if reg == nil {
 		reg = prometheus.DefaultRegisterer
 	}
-	s := &PromSink{
-		events: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "dispatch_events_total",
-			Help: "Total number of dispatch events",
-		}, []string{"vehicle_id", "signal_type", "acknowledged"}),
-		latency: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "dispatch_latency_seconds",
-			Help:    "Time between command send and acknowledgment",
-			Buckets: prometheus.DefBuckets,
-		}, []string{"vehicle_id", "signal_type", "acknowledged"}),
+	events := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "dispatch_events_total",
+		Help: "Total number of dispatch events",
+	}, []string{"vehicle_id", "signal_type", "acknowledged"})
+	latency := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "dispatch_latency_seconds",
+		Help:    "Time between command send and acknowledgment",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"vehicle_id", "signal_type", "acknowledged"})
+
+	if err := reg.Register(events); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			events = are.ExistingCollector.(*prometheus.CounterVec)
+		} else {
+			return nil, err
+		}
 	}
-	reg.MustRegister(s.events, s.latency)
-	return s
+	if err := reg.Register(latency); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			latency = are.ExistingCollector.(*prometheus.HistogramVec)
+		} else {
+			return nil, err
+		}
+	}
+
+	return &PromSink{events: events, latency: latency}, nil
 }
 
 // RecordDispatchResult increments the counter for each dispatch result.

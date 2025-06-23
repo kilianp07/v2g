@@ -13,7 +13,10 @@ import (
 
 func TestPromSink_RecordDispatchResult(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	sink := NewPromSink(reg)
+	sink, err := NewPromSink(reg)
+	if err != nil {
+		t.Fatalf("create sink: %v", err)
+	}
 	now := time.Now()
 	rec := DispatchResult{
 		Signal:       model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: now},
