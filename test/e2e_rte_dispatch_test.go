@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -29,14 +30,31 @@ type managerWrapper struct {
 	vehicles []model.Vehicle
 }
 
+func waitForHTTPServer(s *rte.RTEServerMock, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		url := "http://" + s.Addr() + "/rte/ping"
+		resp, err := http.Get(url)
+		if err == nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			if err := resp.Body.Close(); err != nil {
+				return err
+			}
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return fmt.Errorf("server not ready: %s", s.Addr())
+}
+
 func (m managerWrapper) Dispatch(sig model.FlexibilitySignal, _ []model.Vehicle) dispatch.DispatchResult {
 	return m.mgr.Dispatch(sig, m.vehicles)
 }
 
 func TestRTEDispatchEndToEnd(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	prometheus.DefaultRegisterer = reg
-	prometheus.DefaultGatherer = reg
 
 	sinkIf, err := metrics.NewPromSinkWithRegistry(metrics.Config{}, reg)
 	if err != nil {
@@ -66,7 +84,10 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil, reg)
 	go func() { _ = srv.Start(ctx) }()
-	time.Sleep(100 * time.Millisecond)
+	if err := waitForHTTPServer(srv, 2*time.Second); err != nil {
+		cancel()
+		t.Fatalf("server not ready: %v", err)
+	}
 	defer cancel()
 
 	mux := http.NewServeMux()

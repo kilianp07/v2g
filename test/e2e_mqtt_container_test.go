@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,43 @@ func (c containerWrapper) Dispatch(sig model.FlexibilitySignal, _ []model.Vehicl
 	return c.mgr.Dispatch(sig, c.vehicles)
 }
 
+func waitForServer(s *rte.RTEServerMock, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		url := "http://" + s.Addr() + "/rte/ping"
+		resp, err := http.Get(url)
+		if err == nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			if err := resp.Body.Close(); err != nil {
+				return err
+			}
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return fmt.Errorf("server not ready: %s", s.Addr())
+}
+
+func waitForMetric(url, substr string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(url)
+		if err == nil {
+			body, _ := io.ReadAll(resp.Body)
+			if err := resp.Body.Close(); err != nil {
+				return err
+			}
+			if strings.Contains(string(body), substr) {
+				return nil
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return fmt.Errorf("metric %s not found", substr)
+}
+
 func startMosquitto(ctx context.Context, t *testing.T) (tc.Container, string) {
 	t.Helper()
 	conf := `listener 1883
@@ -74,10 +112,8 @@ log_type information
 connection_messages true
 log_timestamp true
 `
-	path := "./testdata/mosquitto.conf"
-	if err := os.MkdirAll("./testdata", 0755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mosquitto.conf")
 	if err := os.WriteFile(path, []byte(conf), 0644); err != nil {
 		t.Fatalf("write conf: %v", err)
 	}
@@ -161,8 +197,6 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 	defer ackCli.Disconnect(100)
 
 	reg := prometheus.NewRegistry()
-	prometheus.DefaultRegisterer = reg
-	prometheus.DefaultGatherer = reg
 	sinkIf, err := metrics.NewPromSinkWithRegistry(metrics.Config{}, reg)
 	if err != nil {
 		t.Fatalf("prom sink: %v", err)
@@ -197,7 +231,10 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 	ctxSrv, cancel := context.WithCancel(context.Background())
 	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil, reg)
 	go func() { _ = srv.Start(ctxSrv) }()
-	time.Sleep(150 * time.Millisecond)
+	if err := waitForServer(srv, 2*time.Second); err != nil {
+		cancel()
+		t.Fatalf("server not ready: %v", err)
+	}
 	defer cancel()
 
 	mux := http.NewServeMux()
@@ -215,7 +252,9 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		t.Fatalf("status: %d", resp.StatusCode)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	if err := waitForMetric(metricsTS.URL+"/metrics", `rte_signals_total{signal_type="FCR"} 1`, 5*time.Second); err != nil {
+		t.Fatalf("metric wait: %v", err)
+	}
 
 	metricsResp, err := http.Get(metricsTS.URL + "/metrics")
 	if err != nil {

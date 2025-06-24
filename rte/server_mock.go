@@ -51,12 +51,20 @@ func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, log logge
 
 	if err := reg.Register(total); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			total = are.ExistingCollector.(*prometheus.CounterVec)
+			if exist, ok := are.ExistingCollector.(*prometheus.CounterVec); ok {
+				total = exist
+			} else {
+				log.Errorf("existing collector for rte_signals_total has wrong type %T", are.ExistingCollector)
+			}
 		}
 	}
 	if err := reg.Register(failed); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			failed = are.ExistingCollector.(prometheus.Counter)
+			if exist, ok := are.ExistingCollector.(prometheus.Counter); ok {
+				failed = exist
+			} else {
+				log.Errorf("existing collector for rte_signals_failed has wrong type %T", are.ExistingCollector)
+			}
 		}
 	}
 
