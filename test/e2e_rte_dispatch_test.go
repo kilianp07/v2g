@@ -64,7 +64,7 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 
 	wrapper := managerWrapper{mgr: mgr, vehicles: vehicles}
 	ctx, cancel := context.WithCancel(context.Background())
-	srv := rte.NewRTEServerMock(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil)
+	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil, reg)
 	go func() { _ = srv.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 	defer cancel()
@@ -99,10 +99,13 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 	}
 	body, _ := io.ReadAll(metricsResp.Body)
 	log.Printf("metrics output:\n%s", string(body))
-	metricsResp.Body.Close()
+	if err := metricsResp.Body.Close(); err != nil {
+		t.Fatalf("close body: %v", err)
+	}
 	out := string(body)
-	if !strings.Contains(out, "rte_signals_total") {
-		t.Errorf("rte_signals_total missing")
+	expectedSignal := `rte_signals_total{signal_type="FCR"} 1`
+	if !strings.Contains(out, expectedSignal) {
+		t.Errorf("signal metric missing: %s", expectedSignal)
 	}
 	expectedDispatch := `dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="veh1"} 1`
 	if !strings.Contains(out, expectedDispatch) {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,31 +20,52 @@ type RTEServerMock struct {
 	mgr    Manager
 	log    logger.Logger
 	srv    *http.Server
-	total  prometheus.Counter
+	total  *prometheus.CounterVec
 	failed prometheus.Counter
-	byType *prometheus.CounterVec
 }
 
-// NewRTEServerMock creates a new mock server.
-var registerMetricsOnce sync.Once
-
+// NewRTEServerMock creates a new mock server using the default Prometheus
+// registerer.
 func NewRTEServerMock(cfg config.RTEMockConfig, m Manager, log logger.Logger) *RTEServerMock {
+	return NewRTEServerMockWithRegistry(cfg, m, log, prometheus.DefaultRegisterer)
+}
+
+// NewRTEServerMockWithRegistry creates a new mock server and registers metrics on
+// the provided registerer. If reg is nil the default registerer is used.
+func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, log logger.Logger, reg prometheus.Registerer) *RTEServerMock {
 	if log == nil {
 		log = logger.NopLogger{}
 	}
-	total := prometheus.NewCounter(prometheus.CounterOpts{Name: "rte_signals_total", Help: "Total received RTE signals"})
-	failed := prometheus.NewCounter(prometheus.CounterOpts{Name: "rte_signals_failed", Help: "Failed RTE signals"})
-	byType := prometheus.NewCounterVec(prometheus.CounterOpts{Name: "rte_signals_by_type", Help: "Signals by type"}, []string{"type"})
-	registerMetricsOnce.Do(func() {
-		prometheus.MustRegister(total, failed, byType)
+	if reg == nil {
+		reg = prometheus.DefaultRegisterer
+	}
+
+	total := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "rte_signals_total",
+		Help: "Total received RTE signals",
+	}, []string{"signal_type"})
+	failed := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "rte_signals_failed",
+		Help: "Failed RTE signals",
 	})
+
+	if err := reg.Register(total); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			total = are.ExistingCollector.(*prometheus.CounterVec)
+		}
+	}
+	if err := reg.Register(failed); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			failed = are.ExistingCollector.(prometheus.Counter)
+		}
+	}
+
 	return &RTEServerMock{
 		addr:   cfg.Address,
 		mgr:    m,
 		log:    log,
 		total:  total,
 		failed: failed,
-		byType: byType,
 	}
 }
 
@@ -83,8 +103,7 @@ func (s *RTEServerMock) handleSignal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.total.Inc()
-	s.byType.WithLabelValues(sig.SignalType).Inc()
+	s.total.WithLabelValues(sig.SignalType).Inc()
 	s.log.Infof("dispatching %s signal", sig.SignalType)
 	s.mgr.Dispatch(fs, []model.Vehicle{})
 	w.WriteHeader(http.StatusOK)

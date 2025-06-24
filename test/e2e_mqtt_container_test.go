@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -60,7 +61,8 @@ func (c containerWrapper) Dispatch(sig model.FlexibilitySignal, _ []model.Vehicl
 	return c.mgr.Dispatch(sig, c.vehicles)
 }
 
-func TestSignalDispatchWithMQTTContainer(t *testing.T) {
+func startMosquitto(ctx context.Context, t *testing.T) (tc.Container, string) {
+	t.Helper()
 	conf := `listener 1883
 allow_anonymous true
 persistence false
@@ -80,14 +82,13 @@ log_timestamp true
 		t.Fatalf("write conf: %v", err)
 	}
 
-	ctx := context.Background()
 	req := tc.ContainerRequest{
 		Image:        "eclipse-mosquitto:2.0",
 		ExposedPorts: []string{"1883/tcp"},
 		WaitingFor:   wait.ForListeningPort("1883/tcp"),
 		Files: []tc.ContainerFile{
 			{
-				HostFilePath:      "./testdata/mosquitto.conf",
+				HostFilePath:      path,
 				ContainerFilePath: "/mosquitto/config/mosquitto.conf",
 				FileMode:          0644,
 			},
@@ -97,8 +98,6 @@ log_timestamp true
 	if err != nil {
 		t.Fatalf("container start: %v", err)
 	}
-	defer cont.Terminate(ctx)
-
 	host, err := cont.Host(ctx)
 	if err != nil {
 		t.Fatalf("host: %v", err)
@@ -109,12 +108,15 @@ log_timestamp true
 	}
 	broker := fmt.Sprintf("tcp://%s:%s", host, port.Port())
 	addr := net.JoinHostPort(host, port.Port())
-
 	if err := waitForMQTTReady(broker, 5*time.Second); err != nil {
 		t.Logf("mosquitto not ready at %s: %v", addr, err)
 		t.Skip("Mosquitto not ready after retries")
 	}
+	return cont, broker
+}
 
+func connectAckClient(broker string, t *testing.T) paho.Client {
+	t.Helper()
 	ackOpts := paho.NewClientOptions().AddBroker(broker).SetClientID("ack-sim")
 	ackCli := paho.NewClient(ackOpts)
 	var connErr error
@@ -126,14 +128,13 @@ log_timestamp true
 		if connErr == nil {
 			break
 		}
-		t.Logf("ack connect attempt %d to %s: %v", i+1, addr, connErr)
+		t.Logf("ack connect attempt %d to %s: %v", i+1, broker, connErr)
 		time.Sleep(time.Duration(i+1) * 100 * time.Millisecond)
 	}
 	if connErr != nil {
-		t.Logf("ack connect failed to %s: %v", addr, connErr)
+		t.Logf("ack connect failed to %s: %v", broker, connErr)
 		t.Skip("Mosquitto not ready after retries")
 	}
-	defer ackCli.Disconnect(100)
 	if token := ackCli.Subscribe("vehicle/veh1/command", 0, func(_ paho.Client, m paho.Message) {
 		var cmd struct {
 			CommandID string `json:"command_id"`
@@ -144,6 +145,20 @@ log_timestamp true
 	}); token.Wait() && token.Error() != nil {
 		t.Fatalf("subscribe: %v", token.Error())
 	}
+	return ackCli
+}
+
+func TestSignalDispatchWithMQTTContainer(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not installed")
+	}
+	ctx := context.Background()
+
+	cont, broker := startMosquitto(ctx, t)
+	defer func() { _ = cont.Terminate(ctx) }()
+
+	ackCli := connectAckClient(broker, t)
+	defer ackCli.Disconnect(100)
 
 	reg := prometheus.NewRegistry()
 	prometheus.DefaultRegisterer = reg
@@ -180,7 +195,7 @@ log_timestamp true
 	vehicles := []model.Vehicle{{ID: "veh1", SoC: 0.8, IsV2G: true, Available: true, MaxPower: 40, BatteryKWh: 50}}
 	wrapper := containerWrapper{mgr: mgr, vehicles: vehicles}
 	ctxSrv, cancel := context.WithCancel(context.Background())
-	srv := rte.NewRTEServerMock(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil)
+	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil, reg)
 	go func() { _ = srv.Start(ctxSrv) }()
 	time.Sleep(150 * time.Millisecond)
 	defer cancel()
@@ -207,8 +222,14 @@ log_timestamp true
 		t.Fatalf("metrics: %v", err)
 	}
 	body, _ := io.ReadAll(metricsResp.Body)
-	metricsResp.Body.Close()
+	if err := metricsResp.Body.Close(); err != nil {
+		t.Fatalf("close body: %v", err)
+	}
 	out := string(body)
+	expectedSignal := `rte_signals_total{signal_type="FCR"} 1`
+	if !strings.Contains(out, expectedSignal) {
+		t.Errorf("signal metric missing: %s", expectedSignal)
+	}
 	expected := `dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="veh1"} 1`
 	if !strings.Contains(out, expected) {
 		t.Errorf("metric missing: %s", expected)
