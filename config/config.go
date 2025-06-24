@@ -20,6 +20,7 @@ type Config struct {
 	MQTT     mqtt.Config     `json:"mqtt"`
 	Dispatch dispatch.Config `json:"dispatch"`
 	Metrics  metrics.Config  `json:"metrics"`
+	RTE      RTEConfig       `json:"rte"`
 }
 
 func Load(path string) (*Config, error) {

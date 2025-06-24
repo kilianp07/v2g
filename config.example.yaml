@@ -15,3 +15,7 @@ metrics:
   influx_token: "secret"
   influx_org: "my-org"
   influx_bucket: "v2g"
+rte:
+  mode: "mock" # or 'client'
+  mock_address: ":8081"
+  poll_interval_seconds: 60
