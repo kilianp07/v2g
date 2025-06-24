@@ -20,6 +20,7 @@ type Config struct {
 	MQTT     mqtt.Config     `json:"mqtt"`
 	Dispatch dispatch.Config `json:"dispatch"`
 	Metrics  metrics.Config  `json:"metrics"`
+	RTE      RTEConfig       `json:"rte"`
 }
 
 func Load(path string) (*Config, error) {
@@ -46,6 +47,9 @@ func Load(path string) (*Config, error) {
 	}
 	var cfg Config
 	if err := k.UnmarshalWithConf("", &cfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+		return nil, err
+	}
+	if err := cfg.RTE.Validate(); err != nil {
 		return nil, err
 	}
 	return &cfg, nil

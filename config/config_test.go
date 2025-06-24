@@ -20,6 +20,12 @@ dispatch:
   ack_timeout_seconds: 3
 metrics:
   prometheus_enabled: false
+rte:
+  mode: "mock"
+  mock:
+    address: ":9090"
+  client:
+    poll_interval_seconds: 60
 `
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -49,5 +55,14 @@ metrics:
 	}
 	if cfg.Dispatch.AckTimeoutSeconds != 3 {
 		t.Errorf("ack_timeout_seconds mismatch: %d", cfg.Dispatch.AckTimeoutSeconds)
+	}
+	if cfg.RTE.Mode != "mock" {
+		t.Errorf("rte.mode mismatch: %s", cfg.RTE.Mode)
+	}
+	if cfg.RTE.Mock.Address != ":9090" {
+		t.Errorf("rte.mock.address mismatch: %s", cfg.RTE.Mock.Address)
+	}
+	if cfg.RTE.Client.PollIntervalSeconds != 60 {
+		t.Errorf("rte.client.poll_interval_seconds mismatch: %d", cfg.RTE.Client.PollIntervalSeconds)
 	}
 }
