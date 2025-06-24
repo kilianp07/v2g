@@ -22,11 +22,12 @@ func (d *dmMock) Dispatch(model.FlexibilitySignal, []model.Vehicle) dispatch.Dis
 }
 
 func TestRTEServerMock(t *testing.T) {
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
-	prometheus.DefaultGatherer = prometheus.DefaultRegisterer.(prometheus.Gatherer)
+	reg := prometheus.NewRegistry()
+	prometheus.DefaultRegisterer = reg
+	prometheus.DefaultGatherer = reg
 	dm := &dmMock{}
 	cfg := config.RTEMockConfig{Address: ""}
-	srv := NewRTEServerMock(cfg, dm, nil)
+	srv := NewRTEServerMockWithRegistry(cfg, dm, nil, reg)
 	handler := srv.routes()
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
