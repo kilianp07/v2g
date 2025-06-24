@@ -49,5 +49,8 @@ func Load(path string) (*Config, error) {
 	if err := k.UnmarshalWithConf("", &cfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, err
 	}
+	if err := cfg.RTE.Validate(); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
 }

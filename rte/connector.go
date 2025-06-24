@@ -27,8 +27,8 @@ func NewConnector(cfg config.RTEConfig, m Manager, log logger.Logger) RTEConnect
 	}
 	switch strings.ToLower(cfg.Mode) {
 	case "mock":
-		return NewRTEServerMock(cfg, m, log)
+		return NewRTEServerMock(cfg.Mock, m, log)
 	default:
-		return NewRTEClient(cfg, m, log)
+		return NewRTEClient(cfg.Client, m, log)
 	}
 }

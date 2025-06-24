@@ -22,7 +22,10 @@ metrics:
   prometheus_enabled: false
 rte:
   mode: "mock"
-  mock_address: ":9090"
+  mock:
+    address: ":9090"
+  client:
+    poll_interval_seconds: 60
 `
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -56,7 +59,10 @@ rte:
 	if cfg.RTE.Mode != "mock" {
 		t.Errorf("rte.mode mismatch: %s", cfg.RTE.Mode)
 	}
-	if cfg.RTE.MockAddress != ":9090" {
-		t.Errorf("rte.mock_address mismatch: %s", cfg.RTE.MockAddress)
+	if cfg.RTE.Mock.Address != ":9090" {
+		t.Errorf("rte.mock.address mismatch: %s", cfg.RTE.Mock.Address)
+	}
+	if cfg.RTE.Client.PollIntervalSeconds != 60 {
+		t.Errorf("rte.client.poll_interval_seconds mismatch: %d", cfg.RTE.Client.PollIntervalSeconds)
 	}
 }

@@ -54,9 +54,6 @@ func (s Signal) ToFlexibility() (model.FlexibilitySignal, error) {
 	if err != nil {
 		return model.FlexibilitySignal{}, err
 	}
-	if err := s.Validate(); err != nil {
-		return model.FlexibilitySignal{}, err
-	}
 	return model.FlexibilitySignal{
 		Type:      st,
 		PowerKW:   s.Power,

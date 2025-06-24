@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,16 +27,20 @@ type RTEServerMock struct {
 }
 
 // NewRTEServerMock creates a new mock server.
-func NewRTEServerMock(cfg config.RTEConfig, m Manager, log logger.Logger) *RTEServerMock {
+var registerMetricsOnce sync.Once
+
+func NewRTEServerMock(cfg config.RTEMockConfig, m Manager, log logger.Logger) *RTEServerMock {
 	if log == nil {
 		log = logger.NopLogger{}
 	}
 	total := prometheus.NewCounter(prometheus.CounterOpts{Name: "rte_signals_total", Help: "Total received RTE signals"})
 	failed := prometheus.NewCounter(prometheus.CounterOpts{Name: "rte_signals_failed", Help: "Failed RTE signals"})
 	byType := prometheus.NewCounterVec(prometheus.CounterOpts{Name: "rte_signals_by_type", Help: "Signals by type"}, []string{"type"})
-	prometheus.MustRegister(total, failed, byType)
+	registerMetricsOnce.Do(func() {
+		prometheus.MustRegister(total, failed, byType)
+	})
 	return &RTEServerMock{
-		addr:   cfg.MockAddress,
+		addr:   cfg.Address,
 		mgr:    m,
 		log:    log,
 		total:  total,

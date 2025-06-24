@@ -17,5 +17,11 @@ metrics:
   influx_bucket: "v2g"
 rte:
   mode: "mock" # or 'client'
-  mock_address: ":8081"
-  poll_interval_seconds: 60
+  mock:
+    address: ":8081"
+  client:
+    api_url: "https://api.rte.com"
+    client_id: ""
+    client_secret: ""
+    token_url: "https://auth.rte.com/token"
+    poll_interval_seconds: 60

@@ -20,7 +20,7 @@ type RTEClient struct {
 }
 
 // NewRTEClient creates a new RTE API client.
-func NewRTEClient(cfg config.RTEConfig, m Manager, log logger.Logger) *RTEClient {
+func NewRTEClient(cfg config.RTEClientConfig, m Manager, log logger.Logger) *RTEClient {
 	if log == nil {
 		log = logger.NopLogger{}
 	}
@@ -41,13 +41,13 @@ func (c *RTEClient) Start(ctx context.Context) error {
 	c.ticker = time.NewTicker(c.interval)
 	defer c.ticker.Stop()
 	for {
-		if err := c.poll(ctx); err != nil {
-			c.log.Errorf("poll error: %v", err)
-		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-c.ticker.C:
+			if err := c.poll(ctx); err != nil {
+				c.log.Errorf("poll error: %v", err)
+			}
 		}
 	}
 }

@@ -25,7 +25,7 @@ func TestRTEServerMock(t *testing.T) {
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	prometheus.DefaultGatherer = prometheus.DefaultRegisterer.(prometheus.Gatherer)
 	dm := &dmMock{}
-	cfg := config.RTEConfig{MockAddress: ""}
+	cfg := config.RTEMockConfig{Address: ""}
 	srv := NewRTEServerMock(cfg, dm, nil)
 	handler := srv.routes()
 	ts := httptest.NewServer(handler)
