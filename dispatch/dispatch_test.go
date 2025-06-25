@@ -6,6 +6,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/kilianp07/v2g/dispatch/events"
+	"github.com/kilianp07/v2g/internal/eventbus"
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
@@ -58,7 +60,8 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected PromSink")
 	}
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, promSink)
+	bus := eventbus.New()
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, promSink, bus)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,7 +86,8 @@ func TestDispatchManager_Fallback(t *testing.T) {
 	}
 	publisher := mqtt.NewMockPublisher()
 	publisher.FailIDs["v1"] = true
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil)
+	bus := eventbus.New()
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil, bus)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,5 +99,45 @@ func TestDispatchManager_Fallback(t *testing.T) {
 	}
 	if res.FallbackAssignments == nil {
 		t.Fatalf("expected fallback assignments")
+	}
+}
+
+func TestDispatchManager_Events(t *testing.T) {
+	vehicles := []model.Vehicle{
+		{ID: "v1", SoC: 0.7, IsV2G: true, Available: true, MaxPower: 40},
+	}
+	publisher := mqtt.NewMockPublisher()
+	bus := eventbus.New()
+	ch := bus.Subscribe()
+	defer bus.Unsubscribe(ch)
+
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil, bus)
+	if err != nil {
+		t.Fatalf("manager: %v", err)
+	}
+	sig := model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: time.Now()}
+
+	done := make(chan struct{})
+	go func() {
+		var gotSignal, gotAck bool
+		for evt := range ch {
+			switch evt.(type) {
+			case events.SignalEvent:
+				gotSignal = true
+			case events.AckEvent:
+				gotAck = true
+			}
+			if gotSignal && gotAck {
+				close(done)
+				return
+			}
+		}
+	}()
+
+	mgr.Dispatch(sig, vehicles)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("events not received")
 	}
 }

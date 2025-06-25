@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kilianp07/v2g/dispatch/events"
+	"github.com/kilianp07/v2g/internal/eventbus"
 	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
@@ -20,6 +22,7 @@ type DispatchManager struct {
 	ackTimeout time.Duration
 	logger     logger.Logger
 	metrics    metrics.MetricsSink
+	bus        eventbus.EventBus
 }
 
 // Run processes incoming flexibility signals until the context is canceled.
@@ -52,7 +55,7 @@ func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Dura
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
@@ -68,12 +71,16 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		ackTimeout: ackTimeout,
 		logger:     logger.New("dispatch"),
 		metrics:    sink,
+		bus:        bus,
 	}, nil
 }
 
 // Dispatch runs the dispatch process.
 func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
 	filtered := m.filter.Filter(vehicles, signal)
+	if m.bus != nil {
+		m.bus.Publish(events.SignalEvent{Signal: signal})
+	}
 	assignments := m.dispatcher.Dispatch(filtered, signal)
 	m.logger.Infof("dispatching %s to %d vehicles", signal.Type, len(filtered))
 
@@ -124,6 +131,15 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 			res.Errors[id] = err
 		}
 		res.Acknowledged[id] = err == nil && ack
+		if m.bus != nil {
+			m.bus.Publish(events.AckEvent{
+				VehicleID:    id,
+				Signal:       signal.Type,
+				Acknowledged: ack && err == nil,
+				Err:          err,
+				Latency:      dur,
+			})
+		}
 		if recordLatency {
 			lat = append(lat, metrics.DispatchLatency{
 				VehicleID:    id,

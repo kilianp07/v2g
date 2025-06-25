@@ -12,6 +12,7 @@ import (
 
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/dispatch"
+	"github.com/kilianp07/v2g/internal/eventbus"
 	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
@@ -77,6 +78,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	ackTimeout := time.Duration(cfg.Dispatch.AckTimeoutSeconds) * time.Second
+	bus := eventbus.New()
 	manager, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
 		dispatch.EqualDispatcher{},
@@ -84,6 +86,7 @@ func run(cmd *cobra.Command, args []string) error {
 		client,
 		ackTimeout,
 		sink,
+		bus,
 	)
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
