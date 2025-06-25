@@ -36,9 +36,8 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logg := logger.New("dispatch")
+	logg := logger.New("dispatch-command")
 	mqttCfg := cfg.MQTT
-	mqttCfg.Logger = logg
 	client, err := mqtt.NewPahoClient(mqttCfg)
 	if err != nil {
 		return fmt.Errorf("mqtt client: %w", err)
@@ -50,7 +49,6 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 		dispatch.NoopFallback{},
 		client,
 		time.Duration(cfg.Dispatch.AckTimeoutSeconds)*time.Second,
-		logg,
 		nil,
 	)
 	if err != nil {

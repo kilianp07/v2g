@@ -6,7 +6,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
@@ -59,7 +58,7 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected PromSink")
 	}
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{}, promSink)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, promSink)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +83,7 @@ func TestDispatchManager_Fallback(t *testing.T) {
 	}
 	publisher := mqtt.NewMockPublisher()
 	publisher.FailIDs["v1"] = true
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, logger.NopLogger{}, nil)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

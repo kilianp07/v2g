@@ -25,24 +25,21 @@ type InfluxSink struct {
 }
 
 // NewInfluxSink creates a new sink configured for the given InfluxDB endpoint.
-func NewInfluxSink(url, token, org, bucket string, l logger.Logger) *InfluxSink {
-	if l == nil {
-		l = logger.NopLogger{}
-	}
+func NewInfluxSink(url, token, org, bucket string) *InfluxSink {
 	base := strings.TrimSuffix(url, "/api/v2/write")
 	client := influxdb2.NewClientWithOptions(base, token,
 		influxdb2.DefaultOptions().SetHTTPClient(&http.Client{Timeout: 5 * time.Second}))
 	return &InfluxSink{
 		client:   client,
 		writeAPI: client.WriteAPIBlocking(org, bucket),
-		log:      l,
+		log:      logger.New("influx-sink"),
 	}
 }
 
 // NewInfluxSinkWithFallback tries to ping the InfluxDB instance and
 // returns a NopSink if the health check fails.
-func NewInfluxSinkWithFallback(cfg Config, l logger.Logger) MetricsSink {
-	sink := NewInfluxSink(cfg.InfluxURL, cfg.InfluxToken, cfg.InfluxOrg, cfg.InfluxBucket, l)
+func NewInfluxSinkWithFallback(cfg Config) MetricsSink {
+	sink := NewInfluxSink(cfg.InfluxURL, cfg.InfluxToken, cfg.InfluxOrg, cfg.InfluxBucket)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	health, err := sink.client.Health(ctx)

@@ -52,23 +52,21 @@ func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Dura
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, log logger.Logger, sink metrics.MetricsSink) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
 	if ackTimeout <= 0 {
 		ackTimeout = 5 * time.Second
 	}
-	if log == nil {
-		log = logger.NopLogger{}
-	}
+
 	return &DispatchManager{
 		filter:     filter,
 		dispatcher: dispatcher,
 		fallback:   fallback,
 		publisher:  publisher,
 		ackTimeout: ackTimeout,
-		logger:     log,
+		logger:     logger.New("dispatch"),
 		metrics:    sink,
 	}, nil
 }

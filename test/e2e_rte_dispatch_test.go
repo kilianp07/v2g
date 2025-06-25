@@ -18,7 +18,6 @@ import (
 
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
@@ -69,7 +68,6 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 		dispatch.NoopFallback{},
 		publisher,
 		time.Second,
-		logger.NopLogger{},
 		sink,
 	)
 	if err != nil {
@@ -82,7 +80,7 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 
 	wrapper := managerWrapper{mgr: mgr, vehicles: vehicles}
 	ctx, cancel := context.WithCancel(context.Background())
-	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil, reg)
+	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 	go func() { _ = srv.Start(ctx) }()
 	if err := waitForHTTPServer(srv, 2*time.Second); err != nil {
 		cancel()

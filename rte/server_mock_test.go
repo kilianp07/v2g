@@ -27,7 +27,7 @@ func TestRTEServerMock(t *testing.T) {
 	prometheus.DefaultGatherer = reg
 	dm := &dmMock{}
 	cfg := config.RTEMockConfig{Address: ""}
-	srv := NewRTEServerMockWithRegistry(cfg, dm, nil, reg)
+	srv := NewRTEServerMockWithRegistry(cfg, dm, reg)
 	handler := srv.routes()
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
@@ -56,7 +56,7 @@ func TestNewConnectorSelectsMock(t *testing.T) {
 	prometheus.DefaultGatherer = prometheus.DefaultRegisterer.(prometheus.Gatherer)
 	dm := &dmMock{}
 	cfg := config.RTEConfig{Mode: "mock"}
-	c := NewConnector(cfg, dm, nil)
+	c := NewConnector(cfg, dm)
 	if _, ok := c.(*RTEServerMock); !ok {
 		t.Fatalf("expected mock server")
 	}

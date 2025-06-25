@@ -26,19 +26,18 @@ type RTEServerMock struct {
 
 // NewRTEServerMock creates a new mock server using the default Prometheus
 // registerer.
-func NewRTEServerMock(cfg config.RTEMockConfig, m Manager, log logger.Logger) *RTEServerMock {
-	return NewRTEServerMockWithRegistry(cfg, m, log, prometheus.DefaultRegisterer)
+func NewRTEServerMock(cfg config.RTEMockConfig, m Manager) *RTEServerMock {
+	return NewRTEServerMockWithRegistry(cfg, m, prometheus.DefaultRegisterer)
 }
 
 // NewRTEServerMockWithRegistry creates a new mock server and registers metrics on
 // the provided registerer. If reg is nil the default registerer is used.
-func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, log logger.Logger, reg prometheus.Registerer) *RTEServerMock {
-	if log == nil {
-		log = logger.NopLogger{}
-	}
+func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, reg prometheus.Registerer) *RTEServerMock {
 	if reg == nil {
 		reg = prometheus.DefaultRegisterer
 	}
+
+	logger := logger.New("rte-server-mock")
 
 	total := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "rte_signals_total",
@@ -54,7 +53,7 @@ func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, log logge
 			if exist, ok := are.ExistingCollector.(*prometheus.CounterVec); ok {
 				total = exist
 			} else {
-				log.Errorf("existing collector for rte_signals_total has wrong type %T", are.ExistingCollector)
+				logger.Errorf("existing collector for rte_signals_total has wrong type %T", are.ExistingCollector)
 			}
 		}
 	}
@@ -63,7 +62,7 @@ func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, log logge
 			if exist, ok := are.ExistingCollector.(prometheus.Counter); ok {
 				failed = exist
 			} else {
-				log.Errorf("existing collector for rte_signals_failed has wrong type %T", are.ExistingCollector)
+				logger.Errorf("existing collector for rte_signals_failed has wrong type %T", are.ExistingCollector)
 			}
 		}
 	}
@@ -71,7 +70,7 @@ func NewRTEServerMockWithRegistry(cfg config.RTEMockConfig, m Manager, log logge
 	return &RTEServerMock{
 		addr:   cfg.Address,
 		mgr:    m,
-		log:    log,
+		log:    logger,
 		total:  total,
 		failed: failed,
 	}

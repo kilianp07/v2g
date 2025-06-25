@@ -20,16 +20,13 @@ type RTEClient struct {
 }
 
 // NewRTEClient creates a new RTE API client.
-func NewRTEClient(cfg config.RTEClientConfig, m Manager, log logger.Logger) *RTEClient {
-	if log == nil {
-		log = logger.NopLogger{}
-	}
+func NewRTEClient(cfg config.RTEClientConfig, m Manager) *RTEClient {
 	if cfg.PollIntervalSeconds <= 0 {
 		cfg.PollIntervalSeconds = 60
 	}
 	return &RTEClient{
 		mgr:      m,
-		log:      log,
+		log:      logger.New("rte-client"),
 		client:   &http.Client{Timeout: 10 * time.Second},
 		apiURL:   cfg.APIURL,
 		interval: time.Duration(cfg.PollIntervalSeconds) * time.Second,

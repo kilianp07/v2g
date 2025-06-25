@@ -25,7 +25,6 @@ import (
 
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
@@ -207,7 +206,6 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		Broker:   broker,
 		ClientID: "dispatcher",
 		AckTopic: "vehicle/+/ack",
-		Logger:   logger.New("test"),
 	})
 	if err != nil {
 		t.Fatalf("mqtt client: %v", err)
@@ -219,7 +217,6 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		dispatch.NoopFallback{},
 		pub,
 		time.Second,
-		logger.New("test"),
 		sink,
 	)
 	if err != nil {
@@ -229,7 +226,7 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 	vehicles := []model.Vehicle{{ID: "veh1", SoC: 0.8, IsV2G: true, Available: true, MaxPower: 40, BatteryKWh: 50}}
 	wrapper := containerWrapper{mgr: mgr, vehicles: vehicles}
 	ctxSrv, cancel := context.WithCancel(context.Background())
-	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, nil, reg)
+	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 	go func() { _ = srv.Start(ctxSrv) }()
 	if err := waitForServer(srv, 2*time.Second); err != nil {
 		cancel()

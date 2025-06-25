@@ -6,7 +6,6 @@ import (
 
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/logger"
 	"github.com/kilianp07/v2g/model"
 )
 
@@ -21,14 +20,11 @@ type RTEConnector interface {
 }
 
 // NewConnector creates a connector depending on cfg.Mode ("client" or "mock").
-func NewConnector(cfg config.RTEConfig, m Manager, log logger.Logger) RTEConnector {
-	if log == nil {
-		log = logger.NopLogger{}
-	}
+func NewConnector(cfg config.RTEConfig, m Manager) RTEConnector {
 	switch strings.ToLower(cfg.Mode) {
 	case "mock":
-		return NewRTEServerMock(cfg.Mock, m, log)
+		return NewRTEServerMock(cfg.Mock, m)
 	default:
-		return NewRTEClient(cfg.Client, m, log)
+		return NewRTEClient(cfg.Client, m)
 	}
 }

@@ -15,14 +15,13 @@ import (
 
 // Config defines the connection parameters for the Paho MQTT client.
 type Config struct {
-	Broker    string        `json:"broker"`
-	ClientID  string        `json:"client_id"`
-	Username  string        `json:"username"`
-	Password  string        `json:"password"`
-	AckTopic  string        `json:"ack_topic"`
-	UseTLS    bool          `json:"use_tls"`
-	TLSConfig *tls.Config   `json:"-"`
-	Logger    logger.Logger `json:"-"`
+	Broker    string      `json:"broker"`
+	ClientID  string      `json:"client_id"`
+	Username  string      `json:"username"`
+	Password  string      `json:"password"`
+	AckTopic  string      `json:"ack_topic"`
+	UseTLS    bool        `json:"use_tls"`
+	TLSConfig *tls.Config `json:"-"`
 }
 
 // PahoClient implements the Publisher interface using Eclipse Paho.
@@ -37,9 +36,6 @@ type PahoClient struct {
 
 // NewPahoClient connects to the MQTT broker and subscribes to the ACK topic.
 func NewPahoClient(cfg Config) (*PahoClient, error) {
-	if cfg.Logger == nil {
-		cfg.Logger = logger.NopLogger{}
-	}
 	opts := paho.NewClientOptions().AddBroker(cfg.Broker).SetClientID(cfg.ClientID)
 	opts.AutoReconnect = true
 	if cfg.Username != "" {
@@ -51,15 +47,21 @@ func NewPahoClient(cfg Config) (*PahoClient, error) {
 	if cfg.UseTLS && cfg.TLSConfig != nil {
 		opts.SetTLSConfig(cfg.TLSConfig)
 	}
-	pc := &PahoClient{ackTopic: cfg.AckTopic, ackChans: make(map[string]chan struct{}), logger: cfg.Logger}
+
+	logger := logger.New("mqtt_client")
+	pc := &PahoClient{ackTopic: cfg.AckTopic,
+		ackChans: make(map[string]chan struct{}),
+		logger:   logger,
+	}
+
 	opts.OnConnect = func(c paho.Client) {
-		cfg.Logger.Infof("MQTT connected")
+		logger.Infof("MQTT connected")
 		if token := c.Subscribe(pc.ackTopic, 0, pc.onAck); token.Wait() && token.Error() != nil {
-			cfg.Logger.Errorf("subscribe error: %v", token.Error())
+			logger.Errorf("subscribe error: %v", token.Error())
 		}
 	}
 	opts.OnConnectionLost = func(_ paho.Client, err error) {
-		cfg.Logger.Errorf("connection lost: %v", err)
+		logger.Errorf("connection lost: %v", err)
 	}
 	c := paho.NewClient(opts)
 	if token := c.Connect(); token.Wait() && token.Error() != nil {

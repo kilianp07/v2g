@@ -22,7 +22,7 @@ func TestInfluxSink_RecordDispatchResult(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	sink := NewInfluxSink(srv.URL, "token", "org", "bucket", nil)
+	sink := NewInfluxSink(srv.URL, "token", "org", "bucket")
 	now := time.Now()
 	rec := DispatchResult{
 		Signal:       model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: now},
@@ -69,7 +69,7 @@ func TestNewInfluxSinkWithFallback(t *testing.T) {
 		InfluxOrg:    "org",
 		InfluxBucket: "bucket",
 	}
-	sink := NewInfluxSinkWithFallback(cfg, nil)
+	sink := NewInfluxSinkWithFallback(cfg)
 	if _, ok := sink.(*InfluxSink); ok {
 		t.Fatalf("expected NopSink on failing health check")
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/kilianp07/v2g/metrics"
 	"github.com/kilianp07/v2g/model"
 	"github.com/kilianp07/v2g/mqtt"
+	"github.com/kilianp07/v2g/rte"
 )
 
 var cfgPath string
@@ -43,10 +44,8 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	logg := logger.New("main")
-	metricsLogger := logger.New("metrics")
-	mqttCfg := cfg.MQTT
-	mqttCfg.Logger = logg
-	client, err := mqtt.NewPahoClient(mqttCfg)
+
+	client, err := mqtt.NewPahoClient(cfg.MQTT)
 	if err != nil {
 		return fmt.Errorf("mqtt client: %w", err)
 	}
@@ -64,11 +63,13 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}()
 	}
+
 	if cfg.Metrics.InfluxEnabled {
-		sink := metrics.NewInfluxSinkWithFallback(cfg.Metrics, metricsLogger)
+		sink := metrics.NewInfluxSinkWithFallback(cfg.Metrics)
 		sinks = append(sinks, sink)
 	}
-	var sink metrics.MetricsSink = metrics.NopSink{}
+
+	var sink metrics.MetricsSink
 	if len(sinks) == 1 {
 		sink = sinks[0]
 	} else if len(sinks) > 1 {
@@ -82,7 +83,6 @@ func run(cmd *cobra.Command, args []string) error {
 		dispatch.NoopFallback{},
 		client,
 		ackTimeout,
-		logg,
 		sink,
 	)
 	if err != nil {
@@ -91,6 +91,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	signals := make(chan model.FlexibilitySignal, 1)
 	vehicles := []model.Vehicle{}
+	connector := rte.NewConnector(cfg.RTE, manager)
+	go func() {
+		if err := connector.Start(ctx); err != nil {
+			logg.Errorf("connector error: %v", err)
+		}
+	}()
 	go manager.Run(ctx, signals, vehicles)
 
 	// send an initial dummy signal so the service does some work
