@@ -23,6 +23,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/kilianp07/v2g/internal/eventbus"
+
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/dispatch"
 	"github.com/kilianp07/v2g/metrics"
@@ -211,6 +213,7 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		t.Fatalf("mqtt client: %v", err)
 	}
 
+	bus := eventbus.New()
 	mgr, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
 		dispatch.EqualDispatcher{},
@@ -218,6 +221,7 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		pub,
 		time.Second,
 		sink,
+		bus,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
