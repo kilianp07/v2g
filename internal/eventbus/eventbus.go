@@ -15,8 +15,9 @@ type EventBus interface {
 
 // Bus is the default EventBus implementation using fan-out channels.
 type Bus struct {
-	mu   sync.RWMutex
-	subs []chan Event
+	mu     sync.RWMutex
+	subs   []chan Event
+	closed bool
 }
 
 // New creates a new Bus.
@@ -26,6 +27,9 @@ func New() *Bus { return &Bus{} }
 func (b *Bus) Publish(e Event) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	if b.closed {
+		return
+	}
 	for _, ch := range b.subs {
 		select {
 		case ch <- e:
@@ -38,7 +42,11 @@ func (b *Bus) Publish(e Event) {
 func (b *Bus) Subscribe() <-chan Event {
 	ch := make(chan Event, 8)
 	b.mu.Lock()
-	b.subs = append(b.subs, ch)
+	if b.closed {
+		close(ch)
+	} else {
+		b.subs = append(b.subs, ch)
+	}
 	b.mu.Unlock()
 	return ch
 }
@@ -46,19 +54,26 @@ func (b *Bus) Subscribe() <-chan Event {
 // Unsubscribe removes the subscriber and closes its channel.
 func (b *Bus) Unsubscribe(sub <-chan Event) {
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	for i, ch := range b.subs {
 		if ch == sub {
 			b.subs = append(b.subs[:i], b.subs[i+1:]...)
-			close(ch)
-			break
+			if !b.closed {
+				close(ch)
+			}
+			return
 		}
 	}
-	b.mu.Unlock()
 }
 
 // Close closes all subscriber channels and clears the list.
 func (b *Bus) Close() {
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
+	b.closed = true
 	for _, ch := range b.subs {
 		close(ch)
 	}

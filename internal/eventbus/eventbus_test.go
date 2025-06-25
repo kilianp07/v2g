@@ -25,3 +25,15 @@ func TestBusClose(t *testing.T) {
 		t.Fatalf("expected ch2 closed")
 	}
 }
+
+func TestBusUnsubscribeAfterClose(t *testing.T) {
+	bus := New()
+	ch := bus.Subscribe()
+	bus.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("panic on Unsubscribe after Close: %v", r)
+		}
+	}()
+	bus.Unsubscribe(ch)
+}
