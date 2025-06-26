@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"time"
 
@@ -54,7 +56,19 @@ func (r RandomAck) Ack(ctx context.Context, cli paho.Client, vehicleID, commandI
 }
 
 func publishAck(cli paho.Client, vehicleID, commandID string) {
-	payload := fmt.Sprintf(`{"command_id":"%s"}`, commandID)
-	token := cli.Publish(fmt.Sprintf("vehicle/%s/ack", vehicleID), 0, false, []byte(payload))
-	token.Wait()
+	payload, err := json.Marshal(struct {
+		CommandID string `json:"command_id"`
+	}{CommandID: commandID})
+	if err != nil {
+		log.Printf("marshal ack: %v", err)
+		return
+	}
+	token := cli.Publish(fmt.Sprintf("vehicle/%s/ack", vehicleID), 0, false, payload)
+	if !token.WaitTimeout(5 * time.Second) {
+		log.Printf("ack publish timeout for %s", vehicleID)
+		return
+	}
+	if err := token.Error(); err != nil {
+		log.Printf("publish ack error for %s: %v", vehicleID, err)
+	}
 }
