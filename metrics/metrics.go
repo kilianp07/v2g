@@ -42,3 +42,11 @@ type LatencyRecorder interface {
 
 // Ensure NopSink implements LatencyRecorder.
 func (NopSink) RecordDispatchLatency([]DispatchLatency) error { return nil }
+
+// FleetSizeRecorder records the number of vehicles discovered during fleet discovery.
+type FleetSizeRecorder interface {
+	RecordFleetSize(size int) error
+}
+
+// Ensure NopSink implements FleetSizeRecorder.
+func (NopSink) RecordFleetSize(int) error { return nil }

@@ -10,6 +10,7 @@ import (
 type PromSink struct {
 	events  *prometheus.CounterVec
 	latency *prometheus.HistogramVec
+	fleet   prometheus.Gauge
 }
 
 // NewPromSink registers dispatch metrics on the default Prometheus registerer.
@@ -33,6 +34,10 @@ func NewPromSinkWithRegistry(cfg Config, reg prometheus.Registerer) (MetricsSink
 		Help:    "Time between command send and acknowledgment",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"vehicle_id", "signal_type", "acknowledged"})
+	fleet := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "fleet_discovery_vehicles_total",
+		Help: "Number of vehicles discovered during fleet discovery",
+	})
 
 	if err := reg.Register(events); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
@@ -48,8 +53,15 @@ func NewPromSinkWithRegistry(cfg Config, reg prometheus.Registerer) (MetricsSink
 			return nil, err
 		}
 	}
+	if err := reg.Register(fleet); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			fleet = are.ExistingCollector.(prometheus.Gauge)
+		} else {
+			return nil, err
+		}
+	}
 
-	return &PromSink{events: events, latency: latency}, nil
+	return &PromSink{events: events, latency: latency, fleet: fleet}, nil
 }
 
 // RecordDispatchResult increments the counter for each dispatch result.
@@ -64,6 +76,14 @@ func (s *PromSink) RecordDispatchResult(res []DispatchResult) error {
 func (s *PromSink) RecordDispatchLatency(recs []DispatchLatency) error {
 	for _, r := range recs {
 		s.latency.WithLabelValues(r.VehicleID, r.Signal.String(), strconv.FormatBool(r.Acknowledged)).Observe(r.Latency.Seconds())
+	}
+	return nil
+}
+
+// RecordFleetSize sets the gauge to the number of discovered vehicles.
+func (s *PromSink) RecordFleetSize(size int) error {
+	if s.fleet != nil {
+		s.fleet.Set(float64(size))
 	}
 	return nil
 }

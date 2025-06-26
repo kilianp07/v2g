@@ -101,6 +101,7 @@ func (d *PahoFleetDiscovery) Discover(ctx context.Context, timeout time.Duration
 			mu.Unlock()
 			return
 		}
+		d.log.Debugf("received discovery response from %s", v.ID)
 		mu.Lock()
 		if _, exists := ids[v.ID]; !exists {
 			ids[v.ID] = struct{}{}
@@ -112,8 +113,10 @@ func (d *PahoFleetDiscovery) Discover(ctx context.Context, timeout time.Duration
 	if token := d.cli.Subscribe(d.responseTopic, 0, handler); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
+	d.log.Debugf("subscribed to %s", d.responseTopic)
 
 	// publish broadcast
+	d.log.Debugf("publishing discovery ping")
 	if token := d.cli.Publish(d.broadcastTopic, 0, false, []byte(d.magicWord)); token.Wait() && token.Error() != nil {
 		_ = d.cli.Unsubscribe(d.responseTopic)
 		return nil, token.Error()
@@ -136,6 +139,7 @@ func (d *PahoFleetDiscovery) Discover(ctx context.Context, timeout time.Duration
 	err := errors.Join(errs...)
 	res := append([]model.Vehicle(nil), vehicles...)
 	mu.Unlock()
+	d.log.Infof("discovered %d vehicles", len(res))
 	return res, err
 }
 
