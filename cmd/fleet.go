@@ -32,11 +32,24 @@ func runFleetLs(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
-	disc, err := mqtt.NewPahoFleetDiscovery(cfg.MQTT, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
+	discCfg := cfg.MQTT
+	suffix := time.Now().UnixNano()
+	if discCfg.ClientID != "" {
+		discCfg.ClientID = fmt.Sprintf("%s-%d", discCfg.ClientID, suffix)
+	} else {
+		discCfg.ClientID = fmt.Sprintf("fleet-ls-%d", suffix)
+	}
+	disc, err := mqtt.NewPahoFleetDiscovery(discCfg, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
 	if err != nil {
 		return fmt.Errorf("fleet discovery: %w", err)
 	}
-	defer disc.Close()
+	defer func() {
+		if err := disc.Close(); err != nil {
+			if _, ferr := fmt.Fprintf(cmd.ErrOrStderr(), "error while closing discovery: %v\n", err); ferr != nil {
+				fmt.Println("failed to write to stderr:", ferr)
+			}
+		}
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	vehicles, err := disc.Discover(ctx, 2*time.Second)

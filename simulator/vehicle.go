@@ -15,9 +15,13 @@ import (
 
 // SimulatedVehicle connects to MQTT and acknowledges commands.
 type SimulatedVehicle struct {
-	ID       string
-	Broker   string
-	Strategy AckStrategy
+	ID         string
+	Broker     string
+	Strategy   AckStrategy
+	IsV2G      bool
+	MaxPower   float64
+	BatteryKWh float64
+	SoC        float64
 
 	client paho.Client
 	ackCh  chan string
@@ -26,10 +30,14 @@ type SimulatedVehicle struct {
 // NewSimulatedVehicle creates a new vehicle.
 func NewSimulatedVehicle(id, broker string, strat AckStrategy) *SimulatedVehicle {
 	return &SimulatedVehicle{
-		ID:       id,
-		Broker:   broker,
-		Strategy: strat,
-		ackCh:    make(chan string, 50),
+		ID:         id,
+		Broker:     broker,
+		Strategy:   strat,
+		IsV2G:      true,
+		MaxPower:   10,
+		BatteryKWh: 40,
+		SoC:        0.8,
+		ackCh:      make(chan string, 50),
 	}
 }
 
@@ -89,11 +97,11 @@ func (v *SimulatedVehicle) onDiscovery() func(paho.Client, paho.Message) {
 		}
 		payload, err := json.Marshal(model.Vehicle{
 			ID:         v.ID,
-			IsV2G:      true,
+			IsV2G:      v.IsV2G,
 			Available:  true,
-			MaxPower:   10,
-			BatteryKWh: 40,
-			SoC:        0.8,
+			MaxPower:   v.MaxPower,
+			BatteryKWh: v.BatteryKWh,
+			SoC:        v.SoC,
 		})
 		if err != nil {
 			log.Printf("%s: marshal discovery: %v", v.ID, err)
