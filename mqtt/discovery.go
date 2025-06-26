@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	paho "github.com/eclipse/paho.mqtt.golang"
 
 	"github.com/kilianp07/v2g/logger"
@@ -35,7 +37,13 @@ func (d *PahoFleetDiscovery) Close() error {
 
 // NewPahoFleetDiscovery connects to the broker and returns a discovery instance.
 func NewPahoFleetDiscovery(cfg Config, broadcastTopic, responseTopic, magicWord string) (*PahoFleetDiscovery, error) {
-	opts := paho.NewClientOptions().AddBroker(cfg.Broker).SetClientID(cfg.ClientID)
+	id := cfg.ClientID
+	if id != "" {
+		id += "-discovery"
+	} else {
+		id = "discovery-" + uuid.NewString()
+	}
+	opts := paho.NewClientOptions().AddBroker(cfg.Broker).SetClientID(id)
 	opts.AutoReconnect = true
 	if cfg.Username != "" {
 		opts.SetUsername(cfg.Username)
@@ -60,8 +68,14 @@ func NewPahoFleetDiscovery(cfg Config, broadcastTopic, responseTopic, magicWord 
 		magicWord:      magicWord,
 		log:            logger.New("fleet_discovery"),
 	}
+	opts.OnConnect = func(c paho.Client) {
+		d.log.Infof("MQTT connected as %s", id)
+	}
 	opts.OnConnectionLost = func(_ paho.Client, err error) {
 		d.log.Errorf("connection lost: %v", err)
+	}
+	opts.OnReconnecting = func(_ paho.Client, _ *paho.ClientOptions) {
+		d.log.Warnf("reconnecting to MQTT broker")
 	}
 	cli := paho.NewClient(opts)
 	if token := cli.Connect(); token.Wait() && token.Error() != nil {

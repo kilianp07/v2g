@@ -63,6 +63,9 @@ func NewPahoClient(cfg Config) (*PahoClient, error) {
 	opts.OnConnectionLost = func(_ paho.Client, err error) {
 		logger.Errorf("connection lost: %v", err)
 	}
+	opts.OnReconnecting = func(_ paho.Client, _ *paho.ClientOptions) {
+		logger.Warnf("reconnecting to MQTT broker")
+	}
 	c := paho.NewClient(opts)
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
