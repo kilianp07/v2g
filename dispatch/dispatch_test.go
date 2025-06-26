@@ -61,7 +61,7 @@ func TestDispatchManager_Dispatch(t *testing.T) {
 		t.Fatalf("expected PromSink")
 	}
 	bus := eventbus.New()
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, promSink, bus)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, promSink, bus, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestDispatchManager_Fallback(t *testing.T) {
 	publisher := mqtt.NewMockPublisher()
 	publisher.FailIDs["v1"] = true
 	bus := eventbus.New()
-	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil, bus)
+	manager, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil, bus, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestDispatchManager_Events(t *testing.T) {
 	ch := bus.Subscribe()
 	defer bus.Unsubscribe(ch)
 
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil, bus)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, NoopFallback{}, publisher, time.Second, nil, bus, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}

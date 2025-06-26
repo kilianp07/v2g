@@ -45,6 +45,10 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 	}
 
 	bus := eventbus.New()
+	disc, err := mqtt.NewPahoFleetDiscovery(mqttCfg, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
+	if err != nil {
+		return fmt.Errorf("fleet discovery: %w", err)
+	}
 	manager, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
 		dispatch.EqualDispatcher{},
@@ -53,10 +57,16 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 		time.Duration(cfg.Dispatch.AckTimeoutSeconds)*time.Second,
 		nil,
 		bus,
+		disc,
 	)
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
 	}
+	defer func() {
+		if err := manager.Close(); err != nil {
+			logg.Errorf("manager close: %v", err)
+		}
+	}()
 
 	veh := model.Vehicle{ID: "test", IsV2G: true, Available: true, MaxPower: 10, BatteryKWh: 40, SoC: 0.8}
 	sig := model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 5, Duration: time.Minute, Timestamp: time.Now()}

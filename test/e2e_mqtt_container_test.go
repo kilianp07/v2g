@@ -222,6 +222,7 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		time.Second,
 		sink,
 		bus,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)

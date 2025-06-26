@@ -27,3 +27,5 @@ go.work.sum
 
 # VS Code
 .vscode/
+
+config.yaml

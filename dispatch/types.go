@@ -1,6 +1,11 @@
 package dispatch
 
-import "github.com/kilianp07/v2g/model"
+import (
+	"context"
+	"time"
+
+	"github.com/kilianp07/v2g/model"
+)
 
 // DispatchResult contains the result of a dispatch operation.
 type DispatchResult struct {
@@ -36,4 +41,11 @@ type ScoringDispatcher interface {
 // MarketPriceProvider exposes the current market price used by the dispatcher.
 type MarketPriceProvider interface {
 	GetMarketPrice() float64
+}
+
+// FleetDiscovery retrieves the current list of available vehicles.
+// Discover should return within the provided timeout and must be non-blocking.
+type FleetDiscovery interface {
+	Discover(ctx context.Context, timeout time.Duration) ([]model.Vehicle, error)
+	Close() error
 }
