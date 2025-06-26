@@ -26,6 +26,6 @@ options:
 
 Each simulated vehicle subscribes to `vehicle/{id}/command` and, according to the
 configured strategy, publishes acknowledgments to `vehicle/{id}/ack`. It
-periodically publishes its SoC on `vehicle/state/{id}` and answers the
-`v2g/fleet/discovery` broadcast by sending a status message to
-`v2g/fleet/response/{id}`.
+periodically publishes its SoC on `<prefix>/vehicle/state/{id}` and answers the
+`<prefix>/fleet/discovery` broadcast by sending a status message to
+`<prefix>/fleet/response/{id}`.

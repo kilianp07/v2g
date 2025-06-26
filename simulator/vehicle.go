@@ -15,7 +15,7 @@ import (
 	"github.com/kilianp07/v2g/model"
 )
 
-// SimulatedVehicle connects to MQTT and acknowledges commands.
+// command represents a dispatch instruction awaiting acknowledgment.
 type command struct {
 	id       string
 	power    float64
@@ -210,7 +210,7 @@ func (v *SimulatedVehicle) applyPowerOrder(p float64) float64 {
 	} else if p < 0 {
 		ap := -p
 		if ap > v.MaxPower {
-			log.Printf("%s: requested power %.1f exceeds max %.1f", v.ID, p, v.MaxPower)
+			log.Printf("%s: requested power %.1f exceeds max %.1f", v.ID, ap, v.MaxPower)
 			return v.currentPower
 		}
 		if ap > v.Battery.ChargeRateKW {
@@ -259,11 +259,14 @@ func (v *SimulatedVehicle) batteryLoop(ctx context.Context) {
 			state, _ := json.Marshal(struct {
 				SoC float64 `json:"soc"`
 			}{SoC: soc})
-			t := v.client.Publish(fmt.Sprintf("vehicle/state/%s", v.ID), 0, false, state)
+			topic := strings.TrimSuffix(v.TopicPrefix, "/") + "/vehicle/state/" + v.ID
+			t := v.client.Publish(topic, 0, false, state)
 			if !t.WaitTimeout(5 * time.Second) {
 				log.Printf("%s: state publish timeout", v.ID)
 			}
-			_ = t.Error()
+			if err := t.Error(); err != nil {
+				log.Printf("%s: publish state error: %v", v.ID, err)
+			}
 		case <-ctx.Done():
 			return
 		}
