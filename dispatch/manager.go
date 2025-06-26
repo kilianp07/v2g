@@ -19,6 +19,7 @@ type DispatchManager struct {
 	dispatcher Dispatcher
 	fallback   FallbackStrategy
 	publisher  mqtt.Client
+	discovery  FleetDiscovery
 	ackTimeout time.Duration
 	logger     logger.Logger
 	metrics    metrics.MetricsSink
@@ -26,13 +27,14 @@ type DispatchManager struct {
 }
 
 // Run processes incoming flexibility signals until the context is canceled.
-// For each signal received on the channel, Dispatch is invoked with the
-// provided list of vehicles.
-func (m *DispatchManager) Run(ctx context.Context, signals <-chan model.FlexibilitySignal, vehicles []model.Vehicle) {
+// For each signal received on the channel, Dispatch is invoked. If a
+// FleetDiscovery is configured, the vehicles are discovered before each
+// dispatch.
+func (m *DispatchManager) Run(ctx context.Context, signals <-chan model.FlexibilitySignal) {
 	for {
 		select {
 		case sig := <-signals:
-			m.Dispatch(sig, vehicles)
+			m.Dispatch(sig, nil)
 		case <-ctx.Done():
 			return
 		}
@@ -55,7 +57,7 @@ func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Dura
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus, disc FleetDiscovery) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
@@ -68,6 +70,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		dispatcher: dispatcher,
 		fallback:   fallback,
 		publisher:  publisher,
+		discovery:  disc,
 		ackTimeout: ackTimeout,
 		logger:     logger.New("dispatch"),
 		metrics:    sink,
@@ -77,6 +80,15 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 
 // Dispatch runs the dispatch process.
 func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
+	if len(vehicles) == 0 && m.discovery != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		if vs, err := m.discovery.Discover(ctx, time.Second); err == nil {
+			vehicles = vs
+		} else {
+			m.logger.Errorf("fleet discovery failed: %v", err)
+		}
+	}
 	filtered := m.filter.Filter(vehicles, signal)
 	if m.bus != nil {
 		m.bus.Publish(events.SignalEvent{Signal: signal})

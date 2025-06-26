@@ -45,6 +45,10 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 	}
 
 	bus := eventbus.New()
+	disc, err := mqtt.NewPahoFleetDiscovery(mqttCfg, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
+	if err != nil {
+		return fmt.Errorf("fleet discovery: %w", err)
+	}
 	manager, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
 		dispatch.EqualDispatcher{},
@@ -53,6 +57,7 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 		time.Duration(cfg.Dispatch.AckTimeoutSeconds)*time.Second,
 		nil,
 		bus,
+		disc,
 	)
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)

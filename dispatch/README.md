@@ -1,6 +1,6 @@
 # Dispatch Package
 
-This package contains the core logic for distributing flexibility signals to electric vehicles. The `DispatchManager` orchestrates filtering vehicles, allocating power and sending orders via an MQTT `Client` implementation.
+This package contains the core logic for distributing flexibility signals to electric vehicles. The `DispatchManager` orchestrates filtering vehicles, allocating power and sending orders via an MQTT `Client` implementation. It can optionally discover the fleet dynamically via a `FleetDiscovery` component.
 
 The manager waits for acknowledgments from each vehicle concurrently. The maximum wait time can be configured through the `ackTimeout` parameter when creating the manager:
 
@@ -13,6 +13,7 @@ manager, err := dispatch.NewDispatchManager(
     5*time.Second,
     metrics.NopSink{},
     eventbus.New(),
+    nil, // FleetDiscovery
 )
 ```
 

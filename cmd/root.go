@@ -79,6 +79,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	ackTimeout := time.Duration(cfg.Dispatch.AckTimeoutSeconds) * time.Second
 	bus := eventbus.New()
+	disc, err := mqtt.NewPahoFleetDiscovery(cfg.MQTT, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
+	if err != nil {
+		return fmt.Errorf("fleet discovery: %w", err)
+	}
 	manager, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
 		dispatch.EqualDispatcher{},
@@ -87,20 +91,20 @@ func run(cmd *cobra.Command, args []string) error {
 		ackTimeout,
 		sink,
 		bus,
+		disc,
 	)
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
 	}
 
 	signals := make(chan model.FlexibilitySignal, 1)
-	vehicles := []model.Vehicle{}
 	connector := rte.NewConnector(cfg.RTE, manager)
 	go func() {
 		if err := connector.Start(ctx); err != nil {
 			logg.Errorf("connector error: %v", err)
 		}
 	}()
-	go manager.Run(ctx, signals, vehicles)
+	go manager.Run(ctx, signals)
 
 	// send an initial dummy signal so the service does some work
 	signals <- model.FlexibilitySignal{Type: model.SignalFCR, Timestamp: time.Now()}
