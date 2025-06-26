@@ -96,6 +96,11 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
 	}
+	defer func() {
+		if err := manager.Close(); err != nil {
+			logg.Errorf("manager close: %v", err)
+		}
+	}()
 
 	signals := make(chan model.FlexibilitySignal, 1)
 	connector := rte.NewConnector(cfg.RTE, manager)

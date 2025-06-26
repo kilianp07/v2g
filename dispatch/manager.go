@@ -26,6 +26,19 @@ type DispatchManager struct {
 	bus        eventbus.EventBus
 }
 
+// Close releases resources held by the manager.
+func (m *DispatchManager) Close() error {
+	if m.discovery != nil {
+		if err := m.discovery.Close(); err != nil {
+			return err
+		}
+	}
+	if m.bus != nil {
+		m.bus.Close()
+	}
+	return nil
+}
+
 // Run processes incoming flexibility signals until the context is canceled.
 // For each signal received on the channel, Dispatch is invoked. If a
 // FleetDiscovery is configured, the vehicles are discovered before each

@@ -62,6 +62,11 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
 	}
+	defer func() {
+		if err := manager.Close(); err != nil {
+			logg.Errorf("manager close: %v", err)
+		}
+	}()
 
 	veh := model.Vehicle{ID: "test", IsV2G: true, Available: true, MaxPower: 10, BatteryKWh: 40, SoC: 0.8}
 	sig := model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 5, Duration: time.Minute, Timestamp: time.Now()}

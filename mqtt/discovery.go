@@ -3,6 +3,9 @@ package mqtt
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
@@ -22,6 +25,14 @@ type PahoFleetDiscovery struct {
 	log            logger.Logger
 }
 
+// Close disconnects the underlying MQTT client.
+func (d *PahoFleetDiscovery) Close() error {
+	if d.cli != nil && d.cli.IsConnected() {
+		d.cli.Disconnect(250)
+	}
+	return nil
+}
+
 // NewPahoFleetDiscovery connects to the broker and returns a discovery instance.
 func NewPahoFleetDiscovery(cfg Config, broadcastTopic, responseTopic, magicWord string) (*PahoFleetDiscovery, error) {
 	opts := paho.NewClientOptions().AddBroker(cfg.Broker).SetClientID(cfg.ClientID)
@@ -31,8 +42,15 @@ func NewPahoFleetDiscovery(cfg Config, broadcastTopic, responseTopic, magicWord 
 	}
 	if cfg.Password != "" {
 		opts.SetPassword(cfg.Password)
+		cfg.Password = ""
 	}
-	if cfg.UseTLS && cfg.TLSConfig != nil {
+	if cfg.UseTLS {
+		if cfg.TLSConfig == nil {
+			return nil, fmt.Errorf("mqtt tls enabled but TLSConfig is nil")
+		}
+		if len(cfg.TLSConfig.Certificates) == 0 && cfg.TLSConfig.GetCertificate == nil {
+			return nil, fmt.Errorf("tls config missing certificate")
+		}
 		opts.SetTLSConfig(cfg.TLSConfig)
 	}
 
@@ -47,7 +65,7 @@ func NewPahoFleetDiscovery(cfg Config, broadcastTopic, responseTopic, magicWord 
 	}
 	cli := paho.NewClient(opts)
 	if token := cli.Connect(); token.Wait() && token.Error() != nil {
-		return nil, token.Error()
+		return nil, fmt.Errorf("mqtt connect %s: %w", cfg.Broker, token.Error())
 	}
 	d.cli = cli
 	return d, nil
@@ -57,20 +75,27 @@ func NewPahoFleetDiscovery(cfg Config, broadcastTopic, responseTopic, magicWord 
 func (d *PahoFleetDiscovery) Discover(ctx context.Context, timeout time.Duration) ([]model.Vehicle, error) {
 	var (
 		vehicles []model.Vehicle
-		mu       = make(chan model.Vehicle, 16)
+		errs     []error
+		mu       sync.Mutex
+		ids      = make(map[string]struct{})
 	)
-	// subscribe
-	if token := d.cli.Subscribe(d.responseTopic, 0, func(_ paho.Client, m paho.Message) {
+	handler := func(_ paho.Client, m paho.Message) {
 		var v model.Vehicle
 		if err := json.Unmarshal(m.Payload(), &v); err != nil {
-			d.log.Errorf("invalid discovery payload: %v", err)
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("invalid discovery payload: %w", err))
+			mu.Unlock()
 			return
 		}
-		select {
-		case mu <- v:
-		default:
+		mu.Lock()
+		if _, exists := ids[v.ID]; !exists {
+			ids[v.ID] = struct{}{}
+			vehicles = append(vehicles, v)
 		}
-	}); token.Wait() && token.Error() != nil {
+		mu.Unlock()
+	}
+
+	if token := d.cli.Subscribe(d.responseTopic, 0, handler); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
 
@@ -81,23 +106,23 @@ func (d *PahoFleetDiscovery) Discover(ctx context.Context, timeout time.Duration
 	}
 
 	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-loop:
-	for {
-		select {
-		case v := <-mu:
-			vehicles = append(vehicles, v)
-		case <-ctx.Done():
-			break loop
-		case <-timer.C:
-			break loop
-		}
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
 	}
+	timer.Stop()
 
 	if token := d.cli.Unsubscribe(d.responseTopic); token.Wait() && token.Error() != nil {
 		d.log.Errorf("unsubscribe error: %v", token.Error())
+		if t := d.cli.Unsubscribe(d.responseTopic); t.Wait() && t.Error() != nil {
+			d.log.Errorf("retry unsubscribe error: %v", t.Error())
+		}
 	}
-	return vehicles, nil
+	mu.Lock()
+	err := errors.Join(errs...)
+	res := append([]model.Vehicle(nil), vehicles...)
+	mu.Unlock()
+	return res, err
 }
 
 // MockDiscovery is a simple FleetDiscovery used in tests.
@@ -110,3 +135,5 @@ func (m MockDiscovery) Discover(ctx context.Context, timeout time.Duration) ([]m
 	_ = timeout
 	return m.Vehicles, nil
 }
+
+func (m MockDiscovery) Close() error { return nil }

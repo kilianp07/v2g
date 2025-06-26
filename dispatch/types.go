@@ -47,4 +47,5 @@ type MarketPriceProvider interface {
 // Discover should return within the provided timeout and must be non-blocking.
 type FleetDiscovery interface {
 	Discover(ctx context.Context, timeout time.Duration) ([]model.Vehicle, error)
+	Close() error
 }
