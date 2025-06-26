@@ -53,4 +53,17 @@ dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="veh1"} 1
 	if c := testutil.CollectAndCount(sink.latency); c == 0 {
 		t.Errorf("latency not recorded")
 	}
+
+	// record fleet size and verify gauge value
+	if err := sink.RecordFleetSize(42); err != nil {
+		t.Fatalf("fleet size error: %v", err)
+	}
+	expectedFleet := `
+# HELP fleet_discovery_vehicles_total Number of vehicles discovered during fleet discovery
+# TYPE fleet_discovery_vehicles_total gauge
+fleet_discovery_vehicles_total 42
+`
+	if err := testutil.CollectAndCompare(sink.fleet, strings.NewReader(expectedFleet)); err != nil {
+		t.Errorf("unexpected fleet metric: %v", err)
+	}
 }

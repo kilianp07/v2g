@@ -98,6 +98,12 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		defer cancel()
 		if vs, err := m.discovery.Discover(ctx, time.Second); err == nil {
 			vehicles = vs
+			if fr, ok := m.metrics.(metrics.FleetSizeRecorder); ok {
+				if err := fr.RecordFleetSize(len(vs)); err != nil {
+					m.logger.Errorf("fleet size metrics error: %v", err)
+				}
+			}
+			m.logger.Infof("discovered %d vehicles", len(vs))
 		} else {
 			m.logger.Errorf("fleet discovery failed: %v", err)
 		}

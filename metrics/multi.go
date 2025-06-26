@@ -31,3 +31,15 @@ func (m *MultiSink) RecordDispatchLatency(lat []DispatchLatency) error {
 	}
 	return nil
 }
+
+// RecordFleetSize forwards fleet size metrics when supported by the sink.
+func (m *MultiSink) RecordFleetSize(size int) error {
+	for _, s := range m.Sinks {
+		if fr, ok := s.(FleetSizeRecorder); ok {
+			if err := fr.RecordFleetSize(size); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

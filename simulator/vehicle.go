@@ -6,15 +6,22 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
+
+	"github.com/kilianp07/v2g/model"
 )
 
 // SimulatedVehicle connects to MQTT and acknowledges commands.
 type SimulatedVehicle struct {
-	ID       string
-	Broker   string
-	Strategy AckStrategy
+	ID         string
+	Broker     string
+	Strategy   AckStrategy
+	IsV2G      bool
+	MaxPower   float64
+	BatteryKWh float64
+	SoC        float64
 
 	client paho.Client
 	ackCh  chan string
@@ -23,10 +30,14 @@ type SimulatedVehicle struct {
 // NewSimulatedVehicle creates a new vehicle.
 func NewSimulatedVehicle(id, broker string, strat AckStrategy) *SimulatedVehicle {
 	return &SimulatedVehicle{
-		ID:       id,
-		Broker:   broker,
-		Strategy: strat,
-		ackCh:    make(chan string, 50),
+		ID:         id,
+		Broker:     broker,
+		Strategy:   strat,
+		IsV2G:      true,
+		MaxPower:   10,
+		BatteryKWh: 40,
+		SoC:        0.8,
+		ackCh:      make(chan string, 50),
 	}
 }
 
@@ -45,6 +56,11 @@ func (v *SimulatedVehicle) Run(ctx context.Context) error {
 			v.worker(ctx)
 		}()
 	}
+	if token := cli.Subscribe("v2g/fleet/discovery", 0, v.onDiscovery()); token.Wait() && token.Error() != nil {
+		cli.Disconnect(250)
+		return token.Error()
+	}
+
 	topic := fmt.Sprintf("vehicle/%s/command", v.ID)
 	if token := cli.Subscribe(topic, 0, v.onCommand(ctx)); token.Wait() && token.Error() != nil {
 		cli.Disconnect(250)
@@ -70,6 +86,34 @@ func (v *SimulatedVehicle) onCommand(ctx context.Context) func(paho.Client, paho
 		case v.ackCh <- m.CommandID:
 		default:
 			log.Printf("%s: ack queue full, dropping command %s", v.ID, m.CommandID)
+		}
+	}
+}
+
+func (v *SimulatedVehicle) onDiscovery() func(paho.Client, paho.Message) {
+	return func(_ paho.Client, msg paho.Message) {
+		if string(msg.Payload()) != "hello" {
+			return
+		}
+		payload, err := json.Marshal(model.Vehicle{
+			ID:         v.ID,
+			IsV2G:      v.IsV2G,
+			Available:  true,
+			MaxPower:   v.MaxPower,
+			BatteryKWh: v.BatteryKWh,
+			SoC:        v.SoC,
+		})
+		if err != nil {
+			log.Printf("%s: marshal discovery: %v", v.ID, err)
+			return
+		}
+		token := v.client.Publish(fmt.Sprintf("v2g/fleet/response/%s", v.ID), 0, false, payload)
+		if !token.WaitTimeout(5 * time.Second) {
+			log.Printf("%s: discovery publish timeout", v.ID)
+			return
+		}
+		if err := token.Error(); err != nil {
+			log.Printf("%s: publish discovery error: %v", v.ID, err)
 		}
 	}
 }
