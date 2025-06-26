@@ -11,6 +11,8 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
+var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 // AckStrategy defines how a vehicle acknowledges commands.
 type AckStrategy interface {
 	Ack(ctx context.Context, cli paho.Client, vehicleID, commandID string)
@@ -42,7 +44,7 @@ type RandomAck struct {
 
 // Ack implements AckStrategy.
 func (r RandomAck) Ack(ctx context.Context, cli paho.Client, vehicleID, commandID string) {
-	if r.DropRate > 0 && rand.Float64() < r.DropRate {
+	if r.DropRate > 0 && rng.Float64() < r.DropRate {
 		return
 	}
 	if r.Delay > 0 {

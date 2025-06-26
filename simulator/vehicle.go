@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
@@ -36,8 +37,13 @@ func (v *SimulatedVehicle) Run(ctx context.Context) error {
 		return err
 	}
 	v.client = cli
+	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
-		go v.worker(ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			v.worker(ctx)
+		}()
 	}
 	topic := fmt.Sprintf("vehicle/%s/command", v.ID)
 	if token := cli.Subscribe(topic, 0, v.onCommand(ctx)); token.Wait() && token.Error() != nil {
@@ -46,6 +52,7 @@ func (v *SimulatedVehicle) Run(ctx context.Context) error {
 	}
 	<-ctx.Done()
 	close(v.ackCh)
+	wg.Wait()
 	cli.Disconnect(250)
 	return nil
 }
