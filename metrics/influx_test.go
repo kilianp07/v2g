@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,10 +42,11 @@ func TestInfluxSink_RecordDispatchResult(t *testing.T) {
 		AddTag("vehicle_id", "veh1").
 		AddTag("signal_type", "FCR").
 		AddTag("acknowledged", "true").
+		AddTag("dispatch_id", strconv.FormatInt(now.UnixNano(), 10)).
+		AddTag("component", "dispatch_manager").
 		AddField("power_kw", 5.0).
 		AddField("score", 1.2).
 		AddField("market_price", 50.0).
-		AddField("dispatch_time", now.UnixNano()).
 		SetTime(now)
 	expected := strings.TrimSpace(write.PointToLineProtocol(p, time.Nanosecond))
 	if strings.TrimSpace(body) != expected {

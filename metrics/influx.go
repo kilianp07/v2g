@@ -64,16 +64,114 @@ func (s *InfluxSink) RecordDispatchResult(res []DispatchResult) error {
 			AddTag("vehicle_id", r.VehicleID).
 			AddTag("signal_type", signalToString(r.Signal.Type)).
 			AddTag("acknowledged", strconv.FormatBool(r.Acknowledged)).
+			AddTag("dispatch_id", strconv.FormatInt(r.Signal.Timestamp.UnixNano(), 10)).
+			AddTag("component", "dispatch_manager").
 			AddField("power_kw", round3(r.PowerKW)).
 			AddField("score", round3(r.Score)).
 			AddField("market_price", round3(r.MarketPrice)).
-			AddField("dispatch_time", r.DispatchTime.UnixNano()).
 			SetTime(r.Signal.Timestamp)
 		if err := s.writeAPI.WritePoint(ctx, p); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// RecordFleetDiscovery persists the result of a discovery cycle.
+func (s *InfluxSink) RecordFleetDiscovery(ev FleetDiscoveryEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	p := write.NewPointWithMeasurement("fleet_discovery_event").
+		AddTag("component", ev.Component).
+		AddField("pings", ev.Pings).
+		AddField("responses", ev.Responses).
+		SetTime(ev.Time)
+	return s.writeAPI.WritePoint(ctx, p)
+}
+
+// RecordVehicleState writes a snapshot of a vehicle.
+func (s *InfluxSink) RecordVehicleState(ev VehicleStateEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	v := ev.Vehicle
+	p := write.NewPointWithMeasurement("vehicle_state").
+		AddTag("vehicle_id", v.ID)
+	if ev.Component != "" {
+		p.AddTag("component", ev.Component)
+	}
+	p = p.AddTag("context", ev.Context).
+		AddField("soc", round3(v.SoC)).
+		AddField("available", v.Available).
+		AddField("charging", v.Charging).
+		AddField("power_kw", round3(v.MaxPower)).
+		SetTime(ev.Time)
+	return s.writeAPI.WritePoint(ctx, p)
+}
+
+// RecordDispatchOrder records an order being sent.
+func (s *InfluxSink) RecordDispatchOrder(ev DispatchOrderEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	p := write.NewPointWithMeasurement("dispatch_order_sent").
+		AddTag("vehicle_id", ev.VehicleID).
+		AddTag("signal_type", signalToString(ev.Signal)).
+		AddTag("dispatch_id", ev.DispatchID).
+		AddTag("component", "dispatch_manager").
+		AddField("power_kw", round3(ev.PowerKW)).
+		AddField("score", round3(ev.Score)).
+		AddField("market_price", round3(ev.MarketPrice)).
+		SetTime(ev.Time)
+	return s.writeAPI.WritePoint(ctx, p)
+}
+
+// RecordDispatchAck records an acknowledgment result.
+func (s *InfluxSink) RecordDispatchAck(ev DispatchAckEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	p := write.NewPointWithMeasurement("dispatch_ack_received").
+		AddTag("vehicle_id", ev.VehicleID).
+		AddTag("signal_type", signalToString(ev.Signal)).
+		AddTag("acknowledged", strconv.FormatBool(ev.Acknowledged)).
+		AddTag("dispatch_id", ev.DispatchID).
+		AddTag("component", "dispatch_manager").
+		AddField("latency_ms", round3(ev.Latency.Seconds()*1000)).
+		AddField("errors", ev.Error).
+		SetTime(ev.Time)
+	return s.writeAPI.WritePoint(ctx, p)
+}
+
+// RecordFallback records a fallback application.
+func (s *InfluxSink) RecordFallback(ev FallbackEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	p := write.NewPointWithMeasurement("fallback_applied").
+		AddTag("dispatch_id", ev.DispatchID).
+		AddTag("signal_type", signalToString(ev.Signal)).
+		AddTag("component", "fallback")
+	if ev.VehicleID != "" {
+		p = p.AddTag("vehicle_id", ev.VehicleID)
+	}
+	p = p.AddField("power_kw", round3(ev.ResidualPower)).
+		AddField("fallback_reason", ev.Reason).
+		SetTime(ev.Time)
+	return s.writeAPI.WritePoint(ctx, p)
+}
+
+// RecordRTESignal writes a received flexibility signal.
+func (s *InfluxSink) RecordRTESignal(ev RTESignalEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	p := write.NewPointWithMeasurement("rte_signal_received").
+		AddTag("signal_type", signalToString(ev.Signal.Type)).
+		AddTag("component", "rte_connector").
+		AddField("power_kw", round3(ev.Signal.PowerKW)).
+		SetTime(ev.Time)
+	return s.writeAPI.WritePoint(ctx, p)
+}
+
+// LogVehicleState is a helper to record a vehicle snapshot with a context tag.
+func (s *InfluxSink) LogVehicleState(v model.Vehicle, context string) error {
+	return s.RecordVehicleState(VehicleStateEvent{Vehicle: v, Context: context, Time: time.Now()})
 }
 
 func round3(f float64) float64 {
