@@ -38,3 +38,14 @@ If an order fails or no ACK is received before the timeout, a fallback strategy 
 |----------|-------------|
 | `NoopFallback` | Leaves assignments unchanged |
 | `BalancedFallback` | Redistributes residual power proportionally to remaining capacity and SoC |
+| `ProbabilisticFallback` | Uses availability probabilities and degradation factors to reallocate power |
+
+The `Vehicle` model exposes an `EffectiveCapacity(current)` helper that computes
+the usable power capacity of a vehicle based on its SoC, estimated availability
+and degradation. Both fallback strategies rely on this method to ensure
+consistent capacity estimates.
+
+### References
+- Liu et al. (2020) – *A Reliability-Aware Vehicle-to-Grid Scheduling Strategy in Smart Grid*
+- Deng et al. (2021) – *Probabilistic Load Dispatch Considering EV Uncertainty*
+- Zhao et al. (2019) – *SoC-Constrained Dispatch in Aggregated V2G Fleets*

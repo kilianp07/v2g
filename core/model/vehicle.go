@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -17,6 +18,27 @@ type Vehicle struct {
 	Priority   bool      // whether the charging session is marked as priority
 	Departure  time.Time // planned departure time
 	MinSoC     float64   // minimum required SoC at departure
+
+	// Optional profile and metadata information used by advanced algorithms.
+	Profile  UserProfile
+	Metadata map[string]string
+
+	// AvailabilityProb represents the probability the vehicle will remain
+	// connected for the duration of the signal. It should be in the range
+	// [0,1].
+	AvailabilityProb float64
+
+	// DegradationFactor estimates the fraction of capacity lost due to
+	// battery degradation or temperature effects. 0 means no degradation,
+	// 1 means completely unusable.
+	DegradationFactor float64
+}
+
+// UserProfile contains user-specific data that can be leveraged
+// to estimate availability or behaviour.
+type UserProfile struct {
+	ExpectedDeparture time.Time
+	HistoricalUsage   []float64
 }
 
 // Validate checks that the vehicle configuration is sound.
@@ -36,4 +58,35 @@ func (v Vehicle) CanProvidePower(power float64) bool {
 // CanReduceCharge returns true if the vehicle can reduce its charging power.
 func (v Vehicle) CanReduceCharge() bool {
 	return v.Charging && !v.Priority
+}
+
+// EffectiveCapacity returns the estimated remaining power capacity for the
+// vehicle considering SoC, availability probability and degradation factor.
+// Fields left to their zero value are treated as neutral (e.g. probability 1).
+func (v Vehicle) EffectiveCapacity(current float64) float64 {
+	// Minimum usable SoC uses the vehicle's MinSoC when defined, otherwise a
+	// conservative 30% threshold.
+	min := v.MinSoC
+	if min == 0 {
+		min = 0.3
+	}
+	if v.SoC < min {
+		return 0
+	}
+
+	avail := v.AvailabilityProb
+	if avail == 0 {
+		avail = 1
+	}
+	avail = math.Max(0, math.Min(avail, 1))
+
+	degr := math.Max(0, math.Min(v.DegradationFactor, 1))
+
+	cap := v.MaxPower*(1-degr) - current
+	if cap <= 0 {
+		return 0
+	}
+
+	cap *= v.SoC * avail
+	return cap
 }

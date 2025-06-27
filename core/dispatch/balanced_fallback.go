@@ -85,16 +85,9 @@ func (b *BalancedFallback) availableCapacity(current map[string]float64, failed 
 			continue
 		}
 		veh, ok := b.vehicles[id]
-		cap := 0.0 // capacity weighted by state of charge
+		cap := 0.0
 		if ok {
-			cap = veh.MaxPower - math.Abs(res[id])
-			if cap < 0 {
-				cap = 0
-			}
-			if veh.SoC < 0.3 {
-				cap = 0
-			}
-			cap *= veh.SoC
+			cap = veh.EffectiveCapacity(res[id])
 		}
 		if cap > 0 {
 			avail = append(avail, alloc{id: id, capacity: cap})
