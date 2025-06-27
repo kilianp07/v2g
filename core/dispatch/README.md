@@ -32,3 +32,9 @@ disp.MaxRounds = 5
 ```
 
 If an order fails or no ACK is received before the timeout, a fallback strategy can reallocate the remaining power.
+`BalancedFallback` redistributes the residual power among the vehicles that acknowledged, using their remaining capacity weighted by their state of charge. Vehicles below 30% SoC are skipped.
+
+| Fallback | Description |
+|----------|-------------|
+| `NoopFallback` | Leaves assignments unchanged |
+| `BalancedFallback` | Redistributes residual power proportionally to remaining capacity and SoC |

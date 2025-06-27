@@ -109,6 +109,9 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		}
 	}
 	filtered := m.filter.Filter(vehicles, signal)
+	if va, ok := m.fallback.(VehicleAwareFallback); ok {
+		va.SetVehicles(filtered)
+	}
 	if m.bus != nil {
 		m.bus.Publish(events.SignalEvent{Signal: signal})
 	}
