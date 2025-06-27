@@ -11,9 +11,9 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
-	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/metrics"
-	"github.com/kilianp07/v2g/mqtt"
+	"github.com/kilianp07/v2g/core/dispatch"
+	"github.com/kilianp07/v2g/core/metrics"
+	"github.com/kilianp07/v2g/infra/mqtt"
 )
 
 type Config struct {

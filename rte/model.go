@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/core/model"
 )
 
 // Signal represents the payload received from RTE.

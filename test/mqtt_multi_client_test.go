@@ -9,8 +9,8 @@ import (
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/kilianp07/v2g/model"
-	"github.com/kilianp07/v2g/mqtt"
+	"github.com/kilianp07/v2g/core/model"
+	"github.com/kilianp07/v2g/infra/mqtt"
 )
 
 // TestMultipleMQTTClients ensures dispatcher and discovery clients can operate

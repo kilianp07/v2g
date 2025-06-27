@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/core/dispatch"
+	"github.com/kilianp07/v2g/core/model"
 )
 
 // Manager is the subset of dispatch.DispatchManager used by connectors.

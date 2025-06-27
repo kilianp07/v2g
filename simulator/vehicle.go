@@ -11,8 +11,8 @@ import (
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/kilianp07/v2g/metrics"
-	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/core/metrics"
+	"github.com/kilianp07/v2g/core/model"
 )
 
 // command represents a dispatch instruction awaiting acknowledgment.

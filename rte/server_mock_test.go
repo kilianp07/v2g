@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/core/dispatch"
+	"github.com/kilianp07/v2g/core/model"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

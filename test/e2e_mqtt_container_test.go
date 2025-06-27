@@ -26,10 +26,12 @@ import (
 	"github.com/kilianp07/v2g/internal/eventbus"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/dispatch"
-	"github.com/kilianp07/v2g/metrics"
-	"github.com/kilianp07/v2g/model"
-	"github.com/kilianp07/v2g/mqtt"
+	"github.com/kilianp07/v2g/core/dispatch"
+	coremetrics "github.com/kilianp07/v2g/core/metrics"
+	"github.com/kilianp07/v2g/core/model"
+	"github.com/kilianp07/v2g/infra/logger"
+	"github.com/kilianp07/v2g/infra/metrics"
+	"github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/rte"
 )
 
@@ -198,7 +200,7 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 	defer ackCli.Disconnect(100)
 
 	reg := prometheus.NewRegistry()
-	sinkIf, err := metrics.NewPromSinkWithRegistry(metrics.Config{}, reg)
+	sinkIf, err := metrics.NewPromSinkWithRegistry(coremetrics.Config{}, reg)
 	if err != nil {
 		t.Fatalf("prom sink: %v", err)
 	}
@@ -223,6 +225,7 @@ func TestSignalDispatchWithMQTTContainer(t *testing.T) {
 		sink,
 		bus,
 		nil,
+		logger.NopLogger{},
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)

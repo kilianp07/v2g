@@ -11,11 +11,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/dispatch"
+	"github.com/kilianp07/v2g/core/dispatch"
+	"github.com/kilianp07/v2g/core/model"
+	"github.com/kilianp07/v2g/infra/logger"
+	"github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/internal/eventbus"
-	"github.com/kilianp07/v2g/logger"
-	"github.com/kilianp07/v2g/model"
-	"github.com/kilianp07/v2g/mqtt"
 )
 
 var dispatchCmd = &cobra.Command{
@@ -58,6 +58,7 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 		nil,
 		bus,
 		disc,
+		logg,
 	)
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
