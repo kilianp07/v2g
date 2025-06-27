@@ -58,17 +58,34 @@ func (b *BalancedFallback) Reallocate(failed []model.Vehicle, current map[string
 
 	b.logger.Infof("fallback: reallocating %.2f kW after %d failures", residual*sign, len(failed))
 
-	type alloc struct {
-		id       string
-		capacity float64
+	avail := b.availableCapacity(current, failedIDs, res)
+	remaining := allocatePower(avail, res, residual, sign)
+
+	efficiency := 1.0
+	if residual > 0 {
+		efficiency = (residual - remaining) / residual
 	}
+	if remaining > 0 {
+		b.logger.Warnf("fallback: %.2f kW could not be reallocated (%.0f%% efficiency)", remaining, efficiency*100)
+	} else {
+		b.logger.Infof("fallback completed with %.0f%% efficiency", efficiency*100)
+	}
+	return res
+}
+
+type alloc struct {
+	id       string
+	capacity float64
+}
+
+func (b *BalancedFallback) availableCapacity(current map[string]float64, failed map[string]struct{}, res map[string]float64) []alloc {
 	var avail []alloc
 	for id := range current {
-		if _, ok := failedIDs[id]; ok {
+		if _, ok := failed[id]; ok {
 			continue
 		}
 		veh, ok := b.vehicles[id]
-		cap := math.Inf(1)
+		cap := 0.0 // capacity weighted by state of charge
 		if ok {
 			cap = veh.MaxPower - math.Abs(res[id])
 			if cap < 0 {
@@ -83,7 +100,10 @@ func (b *BalancedFallback) Reallocate(failed []model.Vehicle, current map[string
 			avail = append(avail, alloc{id: id, capacity: cap})
 		}
 	}
+	return avail
+}
 
+func allocatePower(avail []alloc, res map[string]float64, residual, sign float64) float64 {
 	remaining := residual
 	for remaining > 0 && len(avail) > 0 {
 		var totalCap float64
@@ -108,14 +128,5 @@ func (b *BalancedFallback) Reallocate(failed []model.Vehicle, current map[string
 		}
 		avail = next
 	}
-	efficiency := 1.0
-	if residual > 0 {
-		efficiency = (residual - remaining) / residual
-	}
-	if remaining > 0 {
-		b.logger.Warnf("fallback: %.2f kW could not be reallocated (%.0f%% efficiency)", remaining, efficiency*100)
-	} else {
-		b.logger.Infof("fallback completed with %.0f%% efficiency", efficiency*100)
-	}
-	return res
+	return remaining
 }
