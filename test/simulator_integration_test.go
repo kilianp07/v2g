@@ -13,36 +13,38 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/kilianp07/v2g/dispatch"
+	"github.com/kilianp07/v2g/core/dispatch"
+	coremetrics "github.com/kilianp07/v2g/core/metrics"
+	"github.com/kilianp07/v2g/core/model"
+	"github.com/kilianp07/v2g/infra/logger"
+	"github.com/kilianp07/v2g/infra/metrics"
+	"github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/internal/eventbus"
-	"github.com/kilianp07/v2g/metrics"
-	"github.com/kilianp07/v2g/model"
-	"github.com/kilianp07/v2g/mqtt"
 )
 
 type recordingSink struct {
-	metrics.NopSink
+	coremetrics.NopSink
 	mu     sync.Mutex
 	states int
 	orders int
 	acks   int
 }
 
-func (r *recordingSink) RecordVehicleState(ev metrics.VehicleStateEvent) error {
+func (r *recordingSink) RecordVehicleState(ev coremetrics.VehicleStateEvent) error {
 	r.mu.Lock()
 	r.states++
 	r.mu.Unlock()
 	return nil
 }
 
-func (r *recordingSink) RecordDispatchOrder(ev metrics.DispatchOrderEvent) error {
+func (r *recordingSink) RecordDispatchOrder(ev coremetrics.DispatchOrderEvent) error {
 	r.mu.Lock()
 	r.orders++
 	r.mu.Unlock()
 	return nil
 }
 
-func (r *recordingSink) RecordDispatchAck(ev metrics.DispatchAckEvent) error {
+func (r *recordingSink) RecordDispatchAck(ev coremetrics.DispatchAckEvent) error {
 	r.mu.Lock()
 	r.acks++
 	r.mu.Unlock()
@@ -114,7 +116,7 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 	t.Logf("discovered %d vehicles", len(vehicles))
 
 	reg := prometheus.NewRegistry()
-	promSinkIf, err := metrics.NewPromSinkWithRegistry(metrics.Config{}, reg)
+	promSinkIf, err := metrics.NewPromSinkWithRegistry(coremetrics.Config{}, reg)
 	if err != nil {
 		t.Fatalf("prom sink: %v", err)
 	}
@@ -140,6 +142,7 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 		sink,
 		bus,
 		disc,
+		logger.NopLogger{},
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)

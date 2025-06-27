@@ -1,6 +1,8 @@
 # v2g
 
-This repository implements a minimal V2G/V2X dispatch prototype in Go. It distributes flexibility signals to electric vehicles over MQTT and collects acknowledgments.
+This repository implements a minimal V2G/V2X dispatch prototype in Go. It
+distributes flexibility signals to electric vehicles over MQTT and collects
+acknowledgments.
 
 ## Building and Testing
 
@@ -14,14 +16,20 @@ go test ./...
 Copy `config.example.yaml` to `config.yaml` and adjust the MQTT credentials to
 match your broker.
 
-## Packages
+## Package Layout
 
-- **model**: domain objects such as `Vehicle` and `FlexibilitySignal`.
-- **mqtt**: MQTT client interface and implementations.
-- **dispatch**: core logic that filters vehicles, allocates power and publishes orders. `SmartDispatcher` provides weighted scoring with fairness and market price awareness. `LPDispatcher` solves a linear program for optimal allocation, and weight tuning can be automated via a `LearningTuner`.
-- **logger**: simple logging abstraction with a no-op implementation and a
-  Zerolog-based logger for structured output. Use `logger.New(component)` to
-  obtain a logger instance. The environment is detected via the `APP_ENV`
-  variable.
+- The code is progressively migrating towards a layered architecture:
 
-See individual package READMEs for more details.
+- **core/** – pure business logic such as dispatch algorithms, domain models
+  and event definitions.
+- **infra/** – technical adapters (MQTT clients, metrics exporters, etc.).
+- **app/** – orchestration layer wiring the service together.
+- **cmd/** – CLI entry points invoking the application service.
+
+The legacy packages have been migrated:
+`core/dispatch`, `core/model`, `core/metrics` host the business
+types and algorithms while infrastructure implementations live in
+`infra/mqtt`, `infra/metrics`, and `infra/logger`.
+Event definitions live under `core/events`.
+
+See individual package READMEs for details.

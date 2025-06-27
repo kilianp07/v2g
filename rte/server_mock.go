@@ -10,8 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/logger"
-	"github.com/kilianp07/v2g/model"
+	"github.com/kilianp07/v2g/core/model"
+	"github.com/kilianp07/v2g/infra/logger"
 )
 
 // RTEServerMock exposes HTTP endpoints for injecting signals locally.

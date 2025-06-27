@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/mqtt"
+	"github.com/kilianp07/v2g/infra/mqtt"
 )
 
 var fleetCmd = &cobra.Command{

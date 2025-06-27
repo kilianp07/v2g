@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/kilianp07/v2g/config"
-	"github.com/kilianp07/v2g/logger"
+	"github.com/kilianp07/v2g/infra/logger"
 )
 
 // RTEClient polls the official RTE API for flexibility signals.

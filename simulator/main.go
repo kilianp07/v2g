@@ -12,7 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kilianp07/v2g/metrics"
+	coremetrics "github.com/kilianp07/v2g/core/metrics"
+	"github.com/kilianp07/v2g/infra/metrics"
 )
 
 func main() {
@@ -46,9 +47,9 @@ func main() {
 	defer stop()
 
 	strat := RandomAck{Delay: cfg.AckLatency, DropRate: cfg.DropRate}
-	var sink metrics.MetricsSink = metrics.NopSink{}
+	var sink coremetrics.MetricsSink = coremetrics.NopSink{}
 	if cfg.InfluxURL != "" {
-		sink = metrics.NewInfluxSinkWithFallback(metrics.Config{
+		sink = metrics.NewInfluxSinkWithFallback(coremetrics.Config{
 			InfluxEnabled: true,
 			InfluxURL:     cfg.InfluxURL,
 			InfluxToken:   cfg.InfluxToken,
