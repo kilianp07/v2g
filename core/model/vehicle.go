@@ -64,28 +64,29 @@ func (v Vehicle) CanReduceCharge() bool {
 // vehicle considering SoC, availability probability and degradation factor.
 // Fields left to their zero value are treated as neutral (e.g. probability 1).
 func (v Vehicle) EffectiveCapacity(current float64) float64 {
+	// Minimum usable SoC uses the vehicle's MinSoC when defined, otherwise a
+	// conservative 30% threshold.
+	min := v.MinSoC
+	if min == 0 {
+		min = 0.3
+	}
+	if v.SoC < min {
+		return 0
+	}
+
 	avail := v.AvailabilityProb
 	if avail == 0 {
 		avail = 1
 	}
-	degr := v.DegradationFactor
-	if degr < 0 {
-		degr = 0
-	}
-	if degr > 1 {
-		degr = 1
-	}
+	avail = math.Max(0, math.Min(avail, 1))
 
-	cap := v.MaxPower*(1-degr) - math.Abs(current)
-	if cap < 0 {
-		cap = 0
-	}
-	if v.SoC < 0.3 {
+	degr := math.Max(0, math.Min(v.DegradationFactor, 1))
+
+	cap := v.MaxPower*(1-degr) - current
+	if cap <= 0 {
 		return 0
 	}
+
 	cap *= v.SoC * avail
-	if cap < 0 {
-		cap = 0
-	}
 	return cap
 }
