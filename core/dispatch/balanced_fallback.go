@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"math"
+	"sync"
 
 	"github.com/kilianp07/v2g/core/logger"
 	"github.com/kilianp07/v2g/core/model"
@@ -10,6 +11,7 @@ import (
 // BalancedFallback redistributes power from failed vehicles to the remaining
 // ones while respecting their max power capacity.
 type BalancedFallback struct {
+	mu       sync.RWMutex
 	vehicles map[string]model.Vehicle
 	logger   logger.Logger
 }
@@ -22,6 +24,8 @@ func NewBalancedFallback(log logger.Logger) *BalancedFallback {
 // SetVehicles stores the vehicles used for a dispatch so that the fallback can
 // compute remaining capacity.
 func (b *BalancedFallback) SetVehicles(vs []model.Vehicle) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.vehicles = make(map[string]model.Vehicle, len(vs))
 	for _, v := range vs {
 		b.vehicles[v.ID] = v
@@ -79,6 +83,8 @@ type alloc struct {
 }
 
 func (b *BalancedFallback) availableCapacity(current map[string]float64, failed map[string]struct{}, res map[string]float64) []alloc {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	var avail []alloc
 	for id := range current {
 		if _, ok := failed[id]; ok {

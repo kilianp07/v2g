@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +17,7 @@ import (
 
 // RTEServerMock exposes HTTP endpoints for injecting signals locally.
 type RTEServerMock struct {
+	mu     sync.RWMutex
 	addr   string
 	mgr    Manager
 	log    logger.Logger
@@ -117,7 +119,11 @@ func (s *RTEServerMock) handleSignal(w http.ResponseWriter, r *http.Request) {
 }
 
 // Addr returns the listening address once Start has been called.
-func (s *RTEServerMock) Addr() string { return s.addr }
+func (s *RTEServerMock) Addr() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.addr
+}
 
 // Start runs the HTTP server until the context is canceled.
 func (s *RTEServerMock) Start(ctx context.Context) error {
@@ -126,7 +132,11 @@ func (s *RTEServerMock) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	s.mu.Lock()
 	s.addr = ln.Addr().String()
+	s.mu.Unlock()
+
 	s.srv = &http.Server{Handler: mux}
 	go func() {
 		<-ctx.Done()
