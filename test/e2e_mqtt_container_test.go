@@ -1,3 +1,5 @@
+//go:build !no_containers
+
 package test
 
 import (

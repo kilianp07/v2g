@@ -1,3 +1,5 @@
+//go:build !no_containers
+
 package test
 
 import (
@@ -49,6 +51,18 @@ func (r *recordingSink) RecordDispatchAck(ev coremetrics.DispatchAckEvent) error
 	r.acks++
 	r.mu.Unlock()
 	return nil
+}
+
+func (r *recordingSink) GetAcks() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.acks
+}
+
+func (r *recordingSink) GetOrders() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.orders
 }
 
 func TestSimulatorAndDispatcherIntegration(t *testing.T) {
@@ -168,7 +182,7 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 		t.Errorf("metric wait: %v", err)
 	}
 
-	if recSink.acks == 0 {
+	if recSink.GetAcks() == 0 {
 		t.Errorf("no dispatch acks recorded")
 	}
 
