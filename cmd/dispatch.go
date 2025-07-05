@@ -64,6 +64,7 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)
 	}
+	manager.SetLPFirst(cfg.Dispatch.LPFirst)
 	defer func() {
 		if err := manager.Close(); err != nil {
 			logg.Errorf("manager close: %v", err)

@@ -58,6 +58,19 @@ If an order fails or no ACK is received before the timeout, a fallback strategy 
 | `BalancedFallback` | Redistributes residual power proportionally to remaining capacity and SoC |
 | `ProbabilisticFallback` | Uses availability probabilities and degradation factors to reallocate power |
 
+### LP-First Dispatch
+
+`DispatchManager` can prioritize the `LPDispatcher` for services that require strict power compliance, such as FCR. Configure the behaviour with the `lp_first` map:
+
+```yaml
+dispatch:
+  ack_timeout_seconds: 5
+  lp_first:
+    "0": true # FCR
+```
+
+When enabled for a signal type, the manager attempts an LP-based allocation first and falls back to `SmartDispatcher` if the solver fails or is infeasible.
+
 The `Vehicle` model exposes an `EffectiveCapacity(current)` helper that computes
 the usable power capacity of a vehicle based on its SoC, estimated availability
 and degradation. Both fallback strategies rely on this method to ensure

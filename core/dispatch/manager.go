@@ -15,18 +15,62 @@ import (
 )
 
 type DispatchManager struct {
-	filter     VehicleFilter
-	dispatcher Dispatcher
-	fallback   FallbackStrategy
-	publisher  mqtt.Client
-	discovery  FleetDiscovery
-	ackTimeout time.Duration
-	logger     logger.Logger
-	metrics    metrics.MetricsSink
-	bus        eventbus.EventBus
-	tuner      LearningTuner
-	history    []DispatchResult
-	mu         sync.Mutex
+	filter       VehicleFilter
+	dispatcher   Dispatcher
+	lpDispatcher *LPDispatcher
+	lpFirst      map[model.SignalType]bool
+	fallback     FallbackStrategy
+	publisher    mqtt.Client
+	discovery    FleetDiscovery
+	ackTimeout   time.Duration
+	logger       logger.Logger
+	metrics      metrics.MetricsSink
+	bus          eventbus.EventBus
+	tuner        LearningTuner
+	history      []DispatchResult
+	mu           sync.Mutex
+}
+
+// SetLPFirst configures which signal types should try LP dispatch first.
+func (m *DispatchManager) SetLPFirst(cfg map[model.SignalType]bool) {
+	if cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lpFirst = make(map[model.SignalType]bool, len(cfg))
+	for k, v := range cfg {
+		m.lpFirst[k] = v
+	}
+}
+
+// dispatchStrategy selects the appropriate dispatcher based on configuration
+// and falls back from LP to Smart on failure.
+func (m *DispatchManager) dispatchStrategy(v []model.Vehicle, s model.FlexibilitySignal) (map[string]float64, Dispatcher) {
+	m.mu.Lock()
+	lpFirst := m.lpFirst[s.Type]
+	m.mu.Unlock()
+
+	if lpFirst && m.lpDispatcher != nil {
+		if m.bus != nil {
+			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "lp_attempt"})
+		}
+		m.logger.Debugf("trying LP dispatch for %s", s.Type)
+		asn, err := m.lpDispatcher.DispatchStrict(v, s)
+		if err == nil {
+			return asn, m.lpDispatcher
+		}
+		if m.bus != nil {
+			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "lp_failure", Err: err})
+		}
+		m.logger.Warnf("LP dispatch failed: %v", err)
+		assignments := m.dispatcher.Dispatch(v, s)
+		if m.bus != nil {
+			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "smart_fallback"})
+		}
+		return assignments, m.dispatcher
+	}
+	return m.dispatcher.Dispatch(v, s), m.dispatcher
 }
 
 // Close releases resources held by the manager.
@@ -81,7 +125,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		ackTimeout = 5 * time.Second
 	}
 
-	return &DispatchManager{
+	mgr := &DispatchManager{
 		filter:     filter,
 		dispatcher: dispatcher,
 		fallback:   fallback,
@@ -92,7 +136,17 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		metrics:    sink,
 		bus:        bus,
 		tuner:      tuner,
-	}, nil
+		lpFirst:    make(map[model.SignalType]bool),
+	}
+	switch d := dispatcher.(type) {
+	case *LPDispatcher:
+		mgr.lpDispatcher = d
+	case *SmartDispatcher:
+		lp := NewLPDispatcher()
+		lp.SmartDispatcher = *d
+		mgr.lpDispatcher = &lp
+	}
+	return mgr, nil
 }
 
 // Dispatch runs the dispatch process.
@@ -119,7 +173,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	if m.bus != nil {
 		m.bus.Publish(events.SignalEvent{Signal: signal})
 	}
-	assignments := m.dispatcher.Dispatch(filtered, signal)
+	assignments, used := m.dispatchStrategy(filtered, signal)
 	m.logger.Infof("dispatching %s to %d vehicles", signal.Type, len(filtered))
 
 	result := DispatchResult{
@@ -132,7 +186,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		result.Assignments[id] = p
 	}
 
-	if sd, ok := m.dispatcher.(ScoringDispatcher); ok {
+	if sd, ok := used.(ScoringDispatcher); ok {
 		for id, s := range sd.GetScores() {
 			result.Scores[id] = s
 		}
@@ -148,7 +202,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	}
 
 	result.Signal = signal
-	if mp, ok := m.dispatcher.(MarketPriceProvider); ok {
+	if mp, ok := used.(MarketPriceProvider); ok {
 		result.MarketPrice = mp.GetMarketPrice()
 	}
 	m.recordMetrics(result, latencies, lr, recordLatency)
