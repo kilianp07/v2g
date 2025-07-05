@@ -7,6 +7,8 @@ mqtt:
   use_tls: false
 dispatch:
   ack_timeout_seconds: 5
+  lp_first:
+    "0": true # FCR
 metrics:
   prometheus_enabled: true
   prometheus_port: ":2112"

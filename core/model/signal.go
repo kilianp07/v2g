@@ -38,3 +38,8 @@ func (t SignalType) String() string {
 		return "unknown"
 	}
 }
+
+// IsStrict returns true for signals that require exact power delivery.
+func (s FlexibilitySignal) IsStrict() bool {
+	return s.Type == SignalFCR
+}

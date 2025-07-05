@@ -76,6 +76,7 @@ func New(cfg *config.Config) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dispatch manager: %w", err)
 	}
+	manager.SetLPFirst(cfg.Dispatch.LPFirst)
 
 	svc := &Service{Manager: manager, bus: bus, log: logg, promEnabled: promEnabled, promPort: promPort}
 	svc.Connector = rte.NewConnector(cfg.RTE, manager)
