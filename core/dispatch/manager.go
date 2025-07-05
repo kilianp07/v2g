@@ -24,6 +24,8 @@ type DispatchManager struct {
 	logger     logger.Logger
 	metrics    metrics.MetricsSink
 	bus        eventbus.EventBus
+	tuner      LearningTuner
+	history    []DispatchResult
 }
 
 // Close releases resources held by the manager.
@@ -70,7 +72,7 @@ func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Dura
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus, disc FleetDiscovery, log logger.Logger) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus, disc FleetDiscovery, log logger.Logger, tuner LearningTuner) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
@@ -88,6 +90,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		logger:     log,
 		metrics:    sink,
 		bus:        bus,
+		tuner:      tuner,
 	}, nil
 }
 
@@ -148,6 +151,10 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		result.MarketPrice = mp.GetMarketPrice()
 	}
 	m.recordMetrics(result, latencies, lr, recordLatency)
+	m.history = append(m.history, result)
+	if m.tuner != nil {
+		m.tuner.Tune(m.history)
+	}
 	return result
 }
 

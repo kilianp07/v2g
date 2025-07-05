@@ -14,8 +14,13 @@ manager, err := dispatch.NewDispatchManager(
     metrics.NopSink{},
     eventbus.New(),
     nil, // FleetDiscovery
+    logger.NopLogger{},
+    nil, // LearningTuner
 )
 ```
+
+Passing a custom tuner allows the dispatcher weights to adapt automatically
+after each dispatch based on historical results.
 
 `SmartDispatcher` exposes weighting factors that can be tuned per signal type.
 Its features are normalized so weights are easier to interpret. You can also
