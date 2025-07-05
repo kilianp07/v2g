@@ -26,6 +26,7 @@ type DispatchManager struct {
 	bus        eventbus.EventBus
 	tuner      LearningTuner
 	history    []DispatchResult
+	mu         sync.Mutex
 }
 
 // Close releases resources held by the manager.
@@ -151,9 +152,12 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		result.MarketPrice = mp.GetMarketPrice()
 	}
 	m.recordMetrics(result, latencies, lr, recordLatency)
+	m.mu.Lock()
 	m.history = append(m.history, result)
+	hist := append([]DispatchResult(nil), m.history...)
+	m.mu.Unlock()
 	if m.tuner != nil {
-		m.tuner.Tune(m.history)
+		m.tuner.Tune(hist)
 	}
 	return result
 }

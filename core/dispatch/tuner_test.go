@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/kilianp07/v2g/core/model"
+	coremqtt "github.com/kilianp07/v2g/core/mqtt"
 	"github.com/kilianp07/v2g/infra/logger"
-	"github.com/kilianp07/v2g/infra/mqtt"
+	imqtt "github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/internal/eventbus"
 )
 
@@ -36,7 +37,7 @@ func TestAckBasedTuner_Decrease(t *testing.T) {
 	history := []DispatchResult{{
 		Assignments:  map[string]float64{"v1": 10},
 		Acknowledged: map[string]bool{"v1": false},
-		Errors:       map[string]error{"v1": fmt.Errorf("timeout waiting for ack")},
+		Errors:       map[string]error{"v1": fmt.Errorf("%w", coremqtt.ErrAckTimeout)},
 	}}
 
 	tuner.Tune(history)
@@ -48,7 +49,7 @@ func TestAckBasedTuner_Decrease(t *testing.T) {
 func TestDispatchManager_NoTuner(t *testing.T) {
 	disp := NewSmartDispatcher()
 	dispatcher := &disp
-	publisher := mqtt.NewMockPublisher()
+	publisher := imqtt.NewMockPublisher()
 	bus := eventbus.New()
 	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, dispatcher, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
 	if err != nil {
@@ -69,7 +70,7 @@ func TestAckBasedTuner_Integration(t *testing.T) {
 	disp.AvailabilityWeight = 0
 	tuner := NewAckBasedTuner(&disp)
 
-	publisher := mqtt.NewMockPublisher()
+	publisher := imqtt.NewMockPublisher()
 	bus := eventbus.New()
 	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, &disp, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, tuner)
 	if err != nil {
@@ -86,5 +87,25 @@ func TestAckBasedTuner_Integration(t *testing.T) {
 
 	if res.Assignments["v1"] <= res.Assignments["v2"] {
 		t.Fatalf("expected higher allocation for v1 after tuning")
+	}
+}
+
+func TestNewAckBasedTunerWithConfig_Validation(t *testing.T) {
+	disp := NewSmartDispatcher()
+	if NewAckBasedTunerWithConfig(nil, 0.1, 0.1, 1, 0, DefaultAckThreshold) != nil {
+		t.Fatal("expected nil with nil dispatcher")
+	}
+	if NewAckBasedTunerWithConfig(&disp, -0.1, 0.1, 1, 0, DefaultAckThreshold) != nil {
+		t.Fatal("expected nil with negative increase")
+	}
+	if NewAckBasedTunerWithConfig(&disp, 0.1, -0.1, 1, 0, DefaultAckThreshold) != nil {
+		t.Fatal("expected nil with negative decrease")
+	}
+	if NewAckBasedTunerWithConfig(&disp, 0.1, 0.1, 0, 1, DefaultAckThreshold) != nil {
+		t.Fatal("expected nil with max < min")
+	}
+	tnr := NewAckBasedTunerWithConfig(&disp, 0.1, 0.1, 1, 0, DefaultAckThreshold)
+	if tnr == nil {
+		t.Fatal("expected tuner instance")
 	}
 }
