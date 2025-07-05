@@ -164,9 +164,10 @@ jobs:
           name: coverage-report
           path: coverage/
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
-          file: coverage/coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/coverage.out
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: true
@@ -294,7 +295,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-          args: --timeout=10m --out-format=colored-line-number
+          args: --timeout=10m
       - name: Install security tools
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest

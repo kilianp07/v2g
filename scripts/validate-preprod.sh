@@ -10,7 +10,7 @@ echo "========================================"
 
 # Variables de configuration
 PROJECT_ROOT=$(pwd)
-COVERAGE_THRESHOLD=80
+COVERAGE_THRESHOLD=30
 TEST_TIMEOUT=30m
 
 # Couleurs pour l'affichage

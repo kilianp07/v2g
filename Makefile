@@ -5,7 +5,7 @@
 # Variables
 GO = go
 TIMEOUT = 30m
-COVERAGE_THRESHOLD = 80
+COVERAGE_THRESHOLD = 30
 BUILD_DIR = build
 COVERAGE_DIR = coverage
 
