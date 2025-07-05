@@ -36,10 +36,41 @@ func (m *DispatchManager) SetLPFirst(cfg map[model.SignalType]bool) {
 	if cfg == nil {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.lpFirst = make(map[model.SignalType]bool, len(cfg))
 	for k, v := range cfg {
 		m.lpFirst[k] = v
 	}
+}
+
+// dispatchStrategy selects the appropriate dispatcher based on configuration
+// and falls back from LP to Smart on failure.
+func (m *DispatchManager) dispatchStrategy(v []model.Vehicle, s model.FlexibilitySignal) (map[string]float64, Dispatcher) {
+	m.mu.Lock()
+	lpFirst := m.lpFirst[s.Type]
+	m.mu.Unlock()
+
+	if lpFirst && m.lpDispatcher != nil {
+		if m.bus != nil {
+			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "lp_attempt"})
+		}
+		m.logger.Debugf("trying LP dispatch for %s", s.Type)
+		asn, err := m.lpDispatcher.DispatchStrict(v, s)
+		if err == nil {
+			return asn, m.lpDispatcher
+		}
+		if m.bus != nil {
+			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "lp_failure", Err: err})
+		}
+		m.logger.Warnf("LP dispatch failed: %v", err)
+		assignments := m.dispatcher.Dispatch(v, s)
+		if m.bus != nil {
+			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "smart_fallback"})
+		}
+		return assignments, m.dispatcher
+	}
+	return m.dispatcher.Dispatch(v, s), m.dispatcher
 }
 
 // Close releases resources held by the manager.
@@ -142,32 +173,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	if m.bus != nil {
 		m.bus.Publish(events.SignalEvent{Signal: signal})
 	}
-	var (
-		assignments map[string]float64
-		used        Dispatcher = m.dispatcher
-	)
-	if m.lpFirst[signal.Type] && m.lpDispatcher != nil {
-		if m.bus != nil {
-			m.bus.Publish(events.StrategyEvent{Signal: signal.Type, Action: "lp_attempt"})
-		}
-		m.logger.Debugf("trying LP dispatch for %s", signal.Type)
-		asn, err := m.lpDispatcher.DispatchStrict(filtered, signal)
-		if err == nil {
-			assignments = asn
-			used = m.lpDispatcher
-		} else {
-			if m.bus != nil {
-				m.bus.Publish(events.StrategyEvent{Signal: signal.Type, Action: "lp_failure", Err: err})
-			}
-			m.logger.Warnf("LP dispatch failed: %v", err)
-			assignments = m.dispatcher.Dispatch(filtered, signal)
-			if m.bus != nil {
-				m.bus.Publish(events.StrategyEvent{Signal: signal.Type, Action: "smart_fallback"})
-			}
-		}
-	} else {
-		assignments = m.dispatcher.Dispatch(filtered, signal)
-	}
+	assignments, used := m.dispatchStrategy(filtered, signal)
 	m.logger.Infof("dispatching %s to %d vehicles", signal.Type, len(filtered))
 
 	result := DispatchResult{

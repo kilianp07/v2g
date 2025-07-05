@@ -69,7 +69,7 @@ dispatch:
     "0": true # FCR
 ```
 
-When enabled for a signal type, the manager attempts an LP-based allocation first and falls back to `SmartDispatcher` if the solve fails or is infeasible.
+When enabled for a signal type, the manager attempts an LP-based allocation first and falls back to `SmartDispatcher` if the solver fails or is infeasible.
 
 The `Vehicle` model exposes an `EffectiveCapacity(current)` helper that computes
 the usable power capacity of a vehicle based on its SoC, estimated availability
