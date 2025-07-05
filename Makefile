@@ -30,8 +30,8 @@ test: test-unit ## Exécuter les tests unitaires (par défaut)
 
 test-unit: ## Exécuter uniquement les tests unitaires
 	@echo "🧪 Exécution des tests unitaires..."
-	$(GO) test -v -race -timeout=$(TIMEOUT) ./core/... ./config/... ./infra/... ./internal/... ./rte/... ./simulator/...
-
+		$(GO) test -v -race -timeout=$(TIMEOUT) ./core/... ./config/... ./infra/... ./internal/... ./rte/... ./simulator/... ./app/... ./cmd/...
+	
 test-integration: ## Exécuter les tests d'intégration
 	@echo "🔗 Exécution des tests d'intégration..."
 	$(GO) test -v -race -timeout=$(TIMEOUT) -run="Integration" -tags="no_containers" ./test/...
@@ -67,11 +67,11 @@ coverage: ## Générer le rapport de couverture
 coverage-check: coverage ## Vérifier que la couverture atteint le seuil
 	@echo "🎯 Vérification du seuil de couverture ($(COVERAGE_THRESHOLD)%)..."
 	@coverage=$$($(GO) tool cover -func=$(COVERAGE_DIR)/coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
-	if [ $$(echo "$$coverage >= $(COVERAGE_THRESHOLD)" | bc -l) -eq 1 ]; then \
-		echo "✅ Couverture: $$coverage% (seuil: $(COVERAGE_THRESHOLD)%)"; \
+	if awk 'BEGIN{exit !('"$$coverage"' >= '"$(COVERAGE_THRESHOLD)"')}' </dev/null; then \
+	echo "✅ Couverture: $$coverage% (seuil: $(COVERAGE_THRESHOLD)%)"; \
 	else \
-		echo "❌ Couverture: $$coverage% < $(COVERAGE_THRESHOLD)%"; \
-		exit 1; \
+	echo "❌ Couverture: $$coverage% < $(COVERAGE_THRESHOLD)%"; \
+	exit 1; \
 	fi
 
 bench: ## Exécuter les benchmarks
@@ -133,6 +133,8 @@ clean: ## Nettoyer les artefacts
 	@echo "🧹 Nettoyage..."
 	@rm -rf $(BUILD_DIR) $(COVERAGE_DIR)
 	@$(GO) clean -testcache
+
+clean-modcache: ## Nettoyer le cache des modules
 	@$(GO) clean -modcache
 
 install-tools: ## Installer les outils de développement

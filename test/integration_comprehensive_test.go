@@ -130,7 +130,7 @@ func runIntegrationTest(t *testing.T, dispatcherType, fallbackType string, vehic
 	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 	go func() { _ = srv.Start(ctx) }()
 
-	if err := waitForHTTPServer(srv, 2*time.Second); err != nil {
+	if err := waitForRTEServer(srv, 2*time.Second); err != nil {
 		t.Fatalf("server not ready: %v", err)
 	}
 
@@ -317,7 +317,7 @@ func TestErrorHandlingIntegration(t *testing.T) {
 				srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 				go func() { _ = srv.Start(ctx) }()
 
-				if err := waitForHTTPServer(srv, 2*time.Second); err != nil {
+				if err := waitForRTEServer(srv, 2*time.Second); err != nil {
 					t.Fatalf("server not ready: %v", err)
 				}
 
@@ -344,7 +344,7 @@ func TestErrorHandlingIntegration(t *testing.T) {
 
 				// Vérifier les résultats selon le cas de test
 				if tc.unavailableVeh {
-					// Avec véhicules non disponibles, fallback devrait être utilisé
+					// Les véhicules étant indisponibles, aucun fallback n'est attendu
 					if len(result.FallbackAssignments) == 0 {
 						t.Log("No fallback assignments, which is expected for unavailable vehicles")
 					}
