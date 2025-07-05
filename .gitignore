@@ -33,3 +33,5 @@ config.yaml
 coverage
 
 .DS_Store
+
+build

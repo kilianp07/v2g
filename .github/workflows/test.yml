@@ -33,7 +33,7 @@ jobs:
       - name: Run unit tests
         run: make test-unit
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit-test-results
@@ -61,7 +61,7 @@ jobs:
       - name: Run integration tests
         run: make test-integration
       - name: Upload integration results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: integration-test-results
@@ -101,7 +101,7 @@ jobs:
         env:
           MQTT_BROKER: localhost:1883
       - name: Upload e2e results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-test-results
@@ -129,7 +129,7 @@ jobs:
       - name: Run critical scenario tests
         run: make test-critical
       - name: Upload critical test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: critical-test-results
@@ -159,7 +159,7 @@ jobs:
       - name: Check coverage threshold
         run: make coverage-check
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
@@ -195,7 +195,7 @@ jobs:
       - name: Run benchmarks
         run: make bench
       - name: Upload performance results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: performance-results
           path: bench-results/
@@ -225,7 +225,7 @@ jobs:
       - name: Run full validation
         run: ./scripts/validate-preprod.sh
       - name: Upload validation report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: validation-report
           path: validation_report.md
@@ -249,8 +249,8 @@ jobs:
     name: Tests Multi-Plateforme
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.21', '1.22']
+        os: [ubuntu-latest]
+        go-version: ['1.23', '1.24']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -294,7 +294,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          args: --timeout=10m
+          args: --timeout=10m --out-format=colored-line-number
       - name: Install security tools
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest

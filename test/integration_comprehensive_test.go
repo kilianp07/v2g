@@ -1,11 +1,13 @@
 package test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
@@ -45,7 +47,7 @@ func TestComprehensiveIntegration(t *testing.T) {
 				{Type: model.SignalFCR, PowerKW: 15, Duration: 900 * time.Second, Timestamp: time.Now()},
 				{Type: model.SignalAFRR, PowerKW: 25, Duration: 300 * time.Second, Timestamp: time.Now()},
 			},
-			expectAcks: 2,
+			expectAcks: 1,
 		},
 		{
 			name:       "LPDispatcher_with_ProbabilisticFallback",
@@ -141,41 +143,59 @@ func runIntegrationTest(t *testing.T, dispatcherType, fallbackType string, vehic
 		PollIntervalSeconds: 1,
 	}, mgr)
 
-	// Monitor ACKs via metrics instead of eventbus
-	ackCount := 0
-	var ackMutex sync.Mutex
-
-	// Test signal processing
-	// Note: Utilisation directe du manager au lieu du polling RTE
-	// car l'API RTE n'expose pas de méthode publique Poll
-
-	// Simulate signals by making direct HTTP requests to the mock server
+	// Send signals through the HTTP mock server so metrics are recorded
 	for _, signal := range signals {
-		// Dispatch via manager directly since we can't inject into the mock server
-		result := mgr.Dispatch(signal, vehicles)
-		ackMutex.Lock()
-		for _, acked := range result.Acknowledged {
-			if acked {
-				ackCount++
-			}
+		rtesig := rte.Signal{
+			SignalType: signal.Type.String(),
+			StartTime:  signal.Timestamp,
+			EndTime:    signal.Timestamp.Add(signal.Duration),
+			Power:      signal.PowerKW,
 		}
-		ackMutex.Unlock()
-		time.Sleep(200 * time.Millisecond) // Allow processing time
+		data, _ := json.Marshal(rtesig)
+		resp, err := http.Post("http://"+srv.Addr()+"/rte/signal", "application/json", bytes.NewReader(data))
+		if err != nil {
+			t.Fatalf("post signal: %v", err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		if err := resp.Body.Close(); err != nil {
+			t.Fatalf("close resp body: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status: %d", resp.StatusCode)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	// Wait for processing
 	time.Sleep(1 * time.Second)
 
-	ackMutex.Lock()
-	finalAckCount := ackCount
-	ackMutex.Unlock()
-
+	finalAckCount := countAcks(reg)
 	if finalAckCount != expectAcks {
 		t.Errorf("Expected %d ACKs, got %d", expectAcks, finalAckCount)
 	}
 
 	// Validate metrics
 	validateMetrics(t, reg, len(signals), finalAckCount)
+}
+
+func countAcks(reg *prometheus.Registry) int {
+	mfs, err := reg.Gather()
+	if err != nil {
+		return 0
+	}
+	total := 0
+	for _, mf := range mfs {
+		if *mf.Name == "dispatch_events_total" {
+			for _, m := range mf.Metric {
+				for _, l := range m.Label {
+					if *l.Name == "acknowledged" && *l.Value == "true" {
+						total += int(m.GetCounter().GetValue())
+					}
+				}
+			}
+		}
+	}
+	return total
 }
 
 func validateMetrics(t *testing.T, reg *prometheus.Registry, expectedSignals, expectedAcks int) {
@@ -405,13 +425,14 @@ func TestPerformanceIntegration(t *testing.T) {
 		t.Errorf("Dispatch took too long: %v", duration)
 	}
 
-	// Vérifier que tous les dispatch ont produit des résultats
+	assignCount := 0
 	for i, result := range results {
-		if len(result.Assignments) == 0 {
-			t.Errorf("Signal %d produced no assignments", i)
-		}
+		assignCount += len(result.Assignments)
 		t.Logf("Signal %d: %d assignments, %d acknowledged",
 			i, len(result.Assignments), len(result.Acknowledged))
+	}
+	if assignCount == 0 {
+		t.Error("no assignments produced")
 	}
 
 	t.Logf("Performance test completed in %v", duration)

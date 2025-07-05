@@ -382,7 +382,9 @@ func testMetricsAccuracy(t *testing.T) {
 			})
 		}
 		if len(metricsResults) > 0 {
-			sink.RecordDispatchResult(metricsResults)
+			if err := sink.RecordDispatchResult(metricsResults); err != nil {
+				t.Fatalf("record dispatch result: %v", err)
+			}
 		}
 	}
 

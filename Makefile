@@ -82,7 +82,7 @@ build: ## Compiler le projet
 	@echo "🔨 Compilation du projet..."
 	@mkdir -p $(BUILD_DIR)
 	$(GO) build -o $(BUILD_DIR)/v2g ./main.go
-	$(GO) build -o $(BUILD_DIR)/simulator ./simulator/main.go
+	$(GO) build -o $(BUILD_DIR)/simulator ./simulator
 
 build-docker: ## Construire les images Docker
 	@echo "🐳 Construction des images Docker..."
