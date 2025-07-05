@@ -14,8 +14,26 @@ manager, err := dispatch.NewDispatchManager(
     metrics.NopSink{},
     eventbus.New(),
     nil, // FleetDiscovery
+    logger.NopLogger{},
+    nil, // LearningTuner
 )
 ```
+
+Passing a custom tuner allows the dispatcher weights to adapt automatically
+after each dispatch based on historical results.
+
+### Dynamic Weight Tuning
+
+`AckBasedTuner` provides a simple feedback loop that increases or decreases the
+`AvailabilityWeight` of a `SmartDispatcher` depending on acknowledgment rates.
+You can create it with defaults:
+
+```go
+tuner := dispatch.NewAckBasedTuner(&dispatcher)
+```
+
+Or use `NewAckBasedTunerWithConfig` to provide custom steps and thresholds. A
+`nil` return indicates an invalid configuration.
 
 `SmartDispatcher` exposes weighting factors that can be tuned per signal type.
 Its features are normalized so weights are easier to interpret. You can also

@@ -74,6 +74,7 @@ func testFleetDiscoveryPerformance(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
@@ -139,6 +140,7 @@ func testHighLoadDispatch(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
@@ -238,6 +240,7 @@ func testFallbackStrategies(t *testing.T) {
 				bus,
 				nil,
 				logger.NopLogger{},
+				nil,
 			)
 			if err != nil {
 				t.Fatalf("manager: %v", err)
@@ -293,6 +296,7 @@ func testMQTTResilience(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
@@ -349,6 +353,7 @@ func testMetricsAccuracy(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
@@ -482,6 +487,7 @@ func testMemoryLeaks(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
@@ -532,6 +538,7 @@ func testConcurrentAccess(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
