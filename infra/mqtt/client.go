@@ -10,6 +10,7 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 
+	coremqtt "github.com/kilianp07/v2g/core/mqtt"
 	"github.com/kilianp07/v2g/infra/logger"
 )
 
@@ -159,6 +160,6 @@ func (p *PahoClient) WaitForAck(commandID string, timeout time.Duration) (bool, 
 		p.mu.Lock()
 		delete(p.ackChans, commandID)
 		p.mu.Unlock()
-		return false, fmt.Errorf("timeout waiting for ack")
+		return false, fmt.Errorf("%w", coremqtt.ErrAckTimeout)
 	}
 }

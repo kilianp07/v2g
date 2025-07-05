@@ -11,16 +11,17 @@ import (
 // weights can be tuned and dynamically adapted based on the signal type. A
 // participation score allows fairness between vehicles.
 type SmartDispatcher struct {
-	SocWeight      float64
-	TimeWeight     float64
-	PriorityWeight float64
-	PriceWeight    float64
-	WearWeight     float64
-	FairnessWeight float64
-	MarketPrice    float64
-	Participation  map[string]float64
-	MaxRounds      int
-	scores         map[string]float64
+	SocWeight          float64
+	TimeWeight         float64
+	PriorityWeight     float64
+	PriceWeight        float64
+	WearWeight         float64
+	FairnessWeight     float64
+	AvailabilityWeight float64
+	MarketPrice        float64
+	Participation      map[string]float64
+	MaxRounds          int
+	scores             map[string]float64
 }
 
 type candidate struct {
@@ -36,25 +37,27 @@ func (d SmartDispatcher) buildCandidates(vehicles []model.Vehicle, signal model.
 // NewSmartDispatcher returns a dispatcher with sensible default weights.
 func NewSmartDispatcher() SmartDispatcher {
 	return SmartDispatcher{
-		SocWeight:      0.5,
-		TimeWeight:     0.3,
-		PriorityWeight: 0.1,
-		PriceWeight:    0.05,
-		WearWeight:     0.05,
-		FairnessWeight: 0.05,
-		Participation:  make(map[string]float64),
-		MaxRounds:      10,
-		scores:         make(map[string]float64),
+		SocWeight:          0.5,
+		TimeWeight:         0.3,
+		PriorityWeight:     0.1,
+		PriceWeight:        0.05,
+		WearWeight:         0.05,
+		FairnessWeight:     0.05,
+		AvailabilityWeight: 0.1,
+		Participation:      make(map[string]float64),
+		MaxRounds:          10,
+		scores:             make(map[string]float64),
 	}
 }
 
-func (d SmartDispatcher) weightsForSignal(t model.SignalType) (float64, float64, float64, float64, float64, float64) {
+func (d SmartDispatcher) weightsForSignal(t model.SignalType) (float64, float64, float64, float64, float64, float64, float64) {
 	soc := d.SocWeight
 	tm := d.TimeWeight
 	prio := d.PriorityWeight
 	price := d.PriceWeight
 	wear := d.WearWeight
 	fair := d.FairnessWeight
+	avail := d.AvailabilityWeight
 	switch t {
 	case model.SignalFCR:
 		// Emphasise immediate power capability
@@ -67,12 +70,12 @@ func (d SmartDispatcher) weightsForSignal(t model.SignalType) (float64, float64,
 	case model.SignalMA, model.SignalEcoWatt:
 		soc += 0.1
 	}
-	return soc, tm, prio, price, wear, fair
+	return soc, tm, prio, price, wear, fair, avail
 }
 
 // vehicleScore computes the weighted score for a vehicle.
 func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) float64 {
-	socW, timeW, prioW, priceW, wearW, fairW := d.weightsForSignal(ctx.Signal.Type)
+	socW, timeW, prioW, priceW, wearW, fairW, availW := d.weightsForSignal(ctx.Signal.Type)
 	if v.BatteryKWh <= 0 {
 		return 0
 	}
@@ -100,6 +103,7 @@ func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) flo
 	}
 	wear := ctx.GetParticipation(v.ID)
 	score := energyNorm*socW + timeScore*timeW + priority*prioW + energyNorm*ctx.MarketPrice*priceW
+	score += v.AvailabilityProb * availW
 	score -= wear*wearW + wear*fairW
 	if score < 0 {
 		return 0

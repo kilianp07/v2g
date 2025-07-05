@@ -76,7 +76,7 @@ func TestDispatchManager_ProbabilisticFallback(t *testing.T) {
 	publisher.FailIDs["v1"] = true
 	fb := NewProbabilisticFallback(logger.NopLogger{})
 	bus := eventbus.New()
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, fb, publisher, time.Second, nil, bus, nil, logger.NopLogger{})
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, fb, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}

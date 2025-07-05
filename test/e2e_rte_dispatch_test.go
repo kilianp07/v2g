@@ -57,6 +57,7 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
