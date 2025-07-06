@@ -292,36 +292,74 @@ func (v *SimulatedVehicle) batteryLoop(ctx context.Context) {
 func (v *SimulatedVehicle) availabilityLoop(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
+	var depart <-chan time.Time
+	if !v.Departure.IsZero() {
+		d := time.Until(v.Departure)
+		if d < 0 {
+			d = 0
+		}
+		depart = time.After(d)
+	}
 	for {
 		select {
 		case <-ticker.C:
-			hour := time.Now().Hour()
+			v.handleAvailabilityTick(ctx)
+		case <-depart:
+			v.mu.Lock()
 			if v.client != nil {
-				if v.DisconnectRate > 0 && rng.Float64() < v.DisconnectRate {
-					v.client.Disconnect(250)
-					v.client = nil
-					v.publishAvailability(false)
-				}
-			} else {
-				if rng.Float64() < v.Availability[hour] {
-					cli, err := newMQTTClient(v.Broker, "sim-"+v.ID)
-					if err == nil {
-						v.client = cli
-						v.publishAvailability(true)
-					}
-				}
+				v.client.Disconnect(250)
+				v.client = nil
 			}
-			if !v.Departure.IsZero() && time.Now().After(v.Departure) {
-				if v.client != nil {
-					v.client.Disconnect(250)
-					v.client = nil
-					v.publishAvailability(false)
-				}
-			}
+			v.mu.Unlock()
+			v.publishAvailability(false)
+			depart = nil
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+func (v *SimulatedVehicle) handleAvailabilityTick(ctx context.Context) {
+	hour := time.Now().Hour()
+	v.mu.Lock()
+	cli := v.client
+	v.mu.Unlock()
+	if cli != nil {
+		if v.DisconnectRate > 0 && rng.Float64() < v.DisconnectRate {
+			cli.Disconnect(250)
+			v.mu.Lock()
+			if v.client == cli {
+				v.client = nil
+			}
+			v.mu.Unlock()
+			v.publishAvailability(false)
+		}
+		return
+	}
+	if rng.Float64() >= v.Availability[hour] {
+		return
+	}
+	newCli, err := newMQTTClient(v.Broker, "sim-"+v.ID)
+	if err != nil {
+		return
+	}
+	broadcast := strings.TrimSuffix(v.TopicPrefix, "/") + "/fleet/discovery"
+	if t := newCli.Subscribe(broadcast, 0, v.onDiscovery()); t.Wait() && t.Error() != nil {
+		newCli.Disconnect(250)
+		return
+	}
+	cmdTopic := fmt.Sprintf("vehicle/%s/command", v.ID)
+	if t := newCli.Subscribe(cmdTopic, 0, v.onCommand(ctx)); t.Wait() && t.Error() != nil {
+		newCli.Disconnect(250)
+		return
+	}
+	v.mu.Lock()
+	if v.client != nil {
+		v.client.Disconnect(250)
+	}
+	v.client = newCli
+	v.mu.Unlock()
+	v.publishAvailability(true)
 }
 
 func (v *SimulatedVehicle) publishAvailability(avail bool) {

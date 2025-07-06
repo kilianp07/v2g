@@ -30,6 +30,17 @@ options:
 --influx-bucket InfluxDB bucket
 ```
 
+The schedule file is a JSON object mapping vehicle IDs to RFC3339 departure
+timestamps, for example:
+
+```json
+{
+  "veh0001": "2024-01-01T09:00:00Z",
+  "veh0002": "2024-01-01T12:00:00Z"
+}
+```
+
+
 Each simulated vehicle subscribes to `vehicle/{id}/command` and, according to the
 configured strategy, publishes acknowledgments to `vehicle/{id}/ack`. It
 periodically publishes its SoC on `<prefix>/vehicle/state/{id}` and answers the

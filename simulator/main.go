@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -26,23 +27,7 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
-	switch cfg.BatteryProfile {
-	case "small":
-		cfg.CapacityKWh = 20
-		cfg.ChargeRateKW = 3.6
-		cfg.DischargeRateKW = 7
-	case "medium":
-		cfg.CapacityKWh = 40
-		cfg.ChargeRateKW = 7
-		cfg.DischargeRateKW = 10
-	case "large":
-		cfg.CapacityKWh = 80
-		cfg.ChargeRateKW = 11
-		cfg.DischargeRateKW = 20
-	case "":
-	default:
-		log.Printf("unknown battery profile %s", cfg.BatteryProfile)
-	}
+	applyBatteryProfile(&cfg)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -59,17 +44,27 @@ func main() {
 	}
 
 	var tmpl map[string]VehicleTemplate
+	var err error
 	if cfg.TemplateFile != "" {
-		data, err := os.ReadFile(cfg.TemplateFile)
-		if err == nil {
-			_ = json.Unmarshal(data, &tmpl)
+		tmpl, err = readTemplateFile(cfg.TemplateFile)
+		if err != nil {
+			log.Fatalf("template file: %v", err)
 		}
 	}
+
 	var prof [24]float64
 	if cfg.AvailabilityFile != "" {
-		data, err := os.ReadFile(cfg.AvailabilityFile)
-		if err == nil {
-			prof, _ = LoadAvailabilityProfile(data)
+		prof, err = readAvailabilityFile(cfg.AvailabilityFile)
+		if err != nil {
+			log.Fatalf("availability file: %v", err)
+		}
+	}
+
+	schedule := map[string]time.Time{}
+	if cfg.ScheduleFile != "" {
+		schedule, err = readScheduleFile(cfg.ScheduleFile)
+		if err != nil {
+			log.Fatalf("schedule file: %v", err)
 		}
 	}
 	fleetCfg := FleetConfig{
@@ -77,34 +72,10 @@ func main() {
 		CommuterPct:    cfg.CommuterPct,
 		DisconnectRate: cfg.DisconnectRate,
 		Availability:   prof,
-		Schedule:       map[string]time.Time{},
+		Schedule:       schedule,
 	}
 	vehicles := GenerateFleet(fleetCfg, tmpl)
-	var wg sync.WaitGroup
-	for i := range vehicles {
-		b := &Battery{
-			CapacityKWh:     cfg.CapacityKWh,
-			Soc:             0.8,
-			ChargeRateKW:    cfg.ChargeRateKW,
-			DischargeRateKW: cfg.DischargeRateKW,
-		}
-		v := &vehicles[i]
-		v.Broker = cfg.Broker
-		v.TopicPrefix = cfg.TopicPrefix
-		v.Strategy = strat
-		v.Interval = cfg.Interval
-		v.MaxPower = cfg.MaxPower
-		v.Battery = b
-		v.Metrics = sink
-		wg.Add(1)
-		go func(v *SimulatedVehicle) {
-			defer wg.Done()
-			if err := v.Run(ctx); err != nil {
-				log.Printf("%s: %v", v.ID, err)
-			}
-		}(v)
-	}
-	wg.Wait()
+	runVehicles(ctx, vehicles, cfg, strat, sink)
 }
 
 func parseFlags() Config {
@@ -133,4 +104,93 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.InfluxBucket, "influx-bucket", "", "InfluxDB bucket")
 	flag.Parse()
 	return cfg
+}
+
+func readTemplateFile(path string) (map[string]VehicleTemplate, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]VehicleTemplate
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func readAvailabilityFile(path string) ([24]float64, error) {
+	var prof [24]float64
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return prof, err
+	}
+	return LoadAvailabilityProfile(data)
+}
+
+func readScheduleFile(path string) (map[string]time.Time, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	sched := make(map[string]time.Time, len(raw))
+	for id, ts := range raw {
+		t, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			return nil, fmt.Errorf("invalid departure for %s: %w", id, err)
+		}
+		sched[id] = t
+	}
+	return sched, nil
+}
+
+func applyBatteryProfile(cfg *Config) {
+	switch cfg.BatteryProfile {
+	case "small":
+		cfg.CapacityKWh = 20
+		cfg.ChargeRateKW = 3.6
+		cfg.DischargeRateKW = 7
+	case "medium":
+		cfg.CapacityKWh = 40
+		cfg.ChargeRateKW = 7
+		cfg.DischargeRateKW = 10
+	case "large":
+		cfg.CapacityKWh = 80
+		cfg.ChargeRateKW = 11
+		cfg.DischargeRateKW = 20
+	case "":
+	default:
+		log.Printf("unknown battery profile %s", cfg.BatteryProfile)
+	}
+}
+
+func runVehicles(ctx context.Context, vehicles []SimulatedVehicle, cfg Config, strat AckStrategy, sink coremetrics.MetricsSink) {
+	var wg sync.WaitGroup
+	for i := range vehicles {
+		b := &Battery{
+			CapacityKWh:     cfg.CapacityKWh,
+			Soc:             0.8,
+			ChargeRateKW:    cfg.ChargeRateKW,
+			DischargeRateKW: cfg.DischargeRateKW,
+		}
+		v := &vehicles[i]
+		v.Broker = cfg.Broker
+		v.TopicPrefix = cfg.TopicPrefix
+		v.Strategy = strat
+		v.Interval = cfg.Interval
+		v.MaxPower = cfg.MaxPower
+		v.Battery = b
+		v.Metrics = sink
+		wg.Add(1)
+		go func(v *SimulatedVehicle) {
+			defer wg.Done()
+			if err := v.Run(ctx); err != nil {
+				log.Printf("%s: %v", v.ID, err)
+			}
+		}(v)
+	}
+	wg.Wait()
 }
