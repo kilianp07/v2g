@@ -72,6 +72,39 @@ dispatch:
 
 When enabled for a signal type, the manager attempts an LP-based allocation first and falls back to `SmartDispatcher` if the solver fails or is infeasible.
 
+### Segmented Smart Dispatcher
+
+`SegmentedSmartDispatcher` applies distinct scoring weights and dispatch strategies per vehicle segment. Each `Vehicle` can specify a `Segment` label. Configure segments in `dispatch.segments`:
+
+```yaml
+dispatch:
+  segments:
+    commuter:
+      dispatcher_type: "heuristic"
+      weights:
+        soc: 0.6
+        time: 0.3
+        priority: 0.1
+    captive_fleet:
+      dispatcher_type: "lp"
+      fallback: true
+      weights:
+        soc: 0.4
+        time: 0.2
+        availability: 0.4
+    opportunistic_charger:
+      dispatcher_type: "heuristic"
+      fallback: true
+      weights:
+        soc: 0.2
+        time: 0.1
+        price: 0.4
+        availability: 0.2
+        wear: 0.1
+```
+
+Missing or unknown segments revert to default `SmartDispatcher` weights.
+
 The `Vehicle` model exposes an `EffectiveCapacity(current)` helper that computes
 the usable power capacity of a vehicle based on its SoC, estimated availability
 and degradation. Both fallback strategies rely on this method to ensure

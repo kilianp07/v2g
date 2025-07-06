@@ -23,6 +23,10 @@ type Vehicle struct {
 	Profile  UserProfile
 	Metadata map[string]string
 
+	// Segment defines the behavioural cluster this vehicle belongs to.
+	// Segments allow dispatchers to apply tailored strategies per group.
+	Segment string `json:"segment,omitempty"`
+
 	// AvailabilityProb represents the probability the vehicle will remain
 	// connected for the duration of the signal. It should be in the range
 	// [0,1].

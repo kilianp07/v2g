@@ -18,6 +18,11 @@ func TestLoad(t *testing.T) {
   use_tls: false
 dispatch:
   ack_timeout_seconds: 3
+  segments:
+    commuter:
+      dispatcher_type: "heuristic"
+    captive_fleet:
+      dispatcher_type: "lp"
 metrics:
   prometheus_enabled: false
 rte:
@@ -55,6 +60,9 @@ rte:
 	}
 	if cfg.Dispatch.AckTimeoutSeconds != 3 {
 		t.Errorf("ack_timeout_seconds mismatch: %d", cfg.Dispatch.AckTimeoutSeconds)
+	}
+	if cfg.Dispatch.Segments["captive_fleet"].DispatcherType != "lp" {
+		t.Errorf("segment not parsed")
 	}
 	if cfg.RTE.Mode != "mock" {
 		t.Errorf("rte.mode mismatch: %s", cfg.RTE.Mode)
