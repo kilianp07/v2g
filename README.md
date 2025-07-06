@@ -106,3 +106,27 @@ mqtt:
 ```
 
 See `config.example.yaml` for more options.
+
+## Dispatch Logs and API
+
+Every dispatch decision is recorded in a structured log. Logs can be persisted to a SQLite database or JSONL file using the `dispatch.LogStore` implementations. Configure a store and attach it to the manager:
+
+```go
+store, _ := dispatch.NewSQLiteStore("dispatch.db")
+manager.SetLogStore(store)
+```
+
+Logs are exposed through the HTTP handler in `api/dispatch`:
+
+```go
+handler := dispatchapi.NewLogHandler(store, "secret-token")
+http.Handle("/api/dispatch/logs", handler)
+```
+
+Query records with optional filters:
+
+```
+GET /api/dispatch/logs?start=2024-01-02T15:04:05Z&end=2024-01-02T16:00:00Z&vehicle_id=v1&signal_type=FCR
+```
+
+Provide the token via `Authorization: Bearer <token>` header.

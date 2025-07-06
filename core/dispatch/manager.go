@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kilianp07/v2g/core/dispatch/logging"
 	"github.com/kilianp07/v2g/core/events"
 	"github.com/kilianp07/v2g/core/logger"
 	"github.com/kilianp07/v2g/core/metrics"
@@ -29,6 +30,7 @@ type DispatchManager struct {
 	bus          eventbus.EventBus
 	tuner        LearningTuner
 	prediction   prediction.PredictionEngine
+	store        logging.LogStore
 	history      []DispatchResult
 	mu           sync.Mutex
 }
@@ -44,6 +46,13 @@ func (m *DispatchManager) SetLPFirst(cfg map[model.SignalType]bool) {
 	for k, v := range cfg {
 		m.lpFirst[k] = v
 	}
+}
+
+// SetLogStore configures the store used to persist dispatch logs.
+func (m *DispatchManager) SetLogStore(store logging.LogStore) {
+	m.mu.Lock()
+	m.store = store
+	m.mu.Unlock()
 }
 
 // dispatchStrategy selects the appropriate dispatcher based on configuration
@@ -84,6 +93,9 @@ func (m *DispatchManager) Close() error {
 	}
 	if m.bus != nil {
 		m.bus.Close()
+	}
+	if m.store != nil {
+		_ = m.store.Close()
 	}
 	return nil
 }
@@ -229,6 +241,33 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	m.history = append(m.history, result)
 	hist := append([]DispatchResult(nil), m.history...)
 	m.mu.Unlock()
+	if m.store != nil {
+		vids := make([]string, 0, len(filtered))
+		for _, v := range filtered {
+			vids = append(vids, v.ID)
+		}
+		lr := logging.Result{
+			Assignments:         result.Assignments,
+			FallbackAssignments: result.FallbackAssignments,
+			Errors:              map[string]string{},
+			Acknowledged:        result.Acknowledged,
+			Signal:              result.Signal,
+			MarketPrice:         result.MarketPrice,
+			Scores:              result.Scores,
+		}
+		for id, err := range result.Errors {
+			if err != nil {
+				lr.Errors[id] = err.Error()
+			}
+		}
+		_ = m.store.Append(context.Background(), logging.LogRecord{
+			Timestamp:        time.Now(),
+			Signal:           signal,
+			TargetPower:      signal.PowerKW,
+			VehiclesSelected: vids,
+			Response:         lr,
+		})
+	}
 	if m.tuner != nil {
 		m.tuner.Tune(hist)
 	}
