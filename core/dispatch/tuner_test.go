@@ -51,7 +51,7 @@ func TestDispatchManager_NoTuner(t *testing.T) {
 	dispatcher := &disp
 	publisher := imqtt.NewMockPublisher()
 	bus := eventbus.New()
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, dispatcher, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, dispatcher, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestAckBasedTuner_Integration(t *testing.T) {
 
 	publisher := imqtt.NewMockPublisher()
 	bus := eventbus.New()
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, &disp, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, tuner)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, &disp, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, tuner, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}

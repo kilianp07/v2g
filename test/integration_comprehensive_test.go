@@ -118,6 +118,7 @@ func runIntegrationTest(t *testing.T, dispatcherType, fallbackType string, vehic
 		nil,
 		logger.NopLogger{},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
@@ -286,6 +287,7 @@ func TestErrorHandlingIntegration(t *testing.T) {
 				nil,
 				logger.NopLogger{},
 				nil,
+				nil,
 			)
 			if err != nil {
 				t.Fatalf("manager: %v", err)
@@ -402,6 +404,7 @@ func TestPerformanceIntegration(t *testing.T) {
 		bus,
 		nil,
 		logger.NopLogger{},
+		nil,
 		nil,
 	)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/kilianp07/v2g/core/metrics"
 	"github.com/kilianp07/v2g/core/model"
 	"github.com/kilianp07/v2g/core/mqtt"
+	"github.com/kilianp07/v2g/core/prediction"
 	"github.com/kilianp07/v2g/internal/eventbus"
 )
 
@@ -27,6 +28,7 @@ type DispatchManager struct {
 	metrics      metrics.MetricsSink
 	bus          eventbus.EventBus
 	tuner        LearningTuner
+	prediction   prediction.PredictionEngine
 	history      []DispatchResult
 	mu           sync.Mutex
 }
@@ -117,7 +119,7 @@ func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Dura
 // NewDispatchManager creates a new manager.
 // ackTimeout defines the maximum duration to wait for acknowledgments from vehicles.
 // If ackTimeout is zero, a default of five seconds is used.
-func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus, disc FleetDiscovery, log logger.Logger, tuner LearningTuner) (*DispatchManager, error) {
+func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback FallbackStrategy, publisher mqtt.Client, ackTimeout time.Duration, sink metrics.MetricsSink, bus eventbus.EventBus, disc FleetDiscovery, log logger.Logger, tuner LearningTuner, pred prediction.PredictionEngine) (*DispatchManager, error) {
 	if filter == nil || dispatcher == nil || fallback == nil || publisher == nil {
 		return nil, fmt.Errorf("dispatch: nil parameter provided to NewDispatchManager")
 	}
@@ -136,6 +138,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 		metrics:    sink,
 		bus:        bus,
 		tuner:      tuner,
+		prediction: pred,
 		lpFirst:    make(map[model.SignalType]bool),
 	}
 	switch d := dispatcher.(type) {
@@ -167,6 +170,18 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 		}
 	}
 	filtered := m.filter.Filter(vehicles, signal)
+	if m.prediction != nil {
+		horizon := signal.Duration
+		if horizon <= 0 {
+			horizon = time.Hour
+		}
+		for i, v := range filtered {
+			filtered[i].AvailabilityProb = m.prediction.PredictAvailability(v.ID, signal.Timestamp.Add(horizon))
+			if fc := m.prediction.ForecastSoC(v.ID, horizon); len(fc) > 0 {
+				filtered[i].SoC = fc[len(fc)-1]
+			}
+		}
+	}
 	if va, ok := m.fallback.(VehicleAwareFallback); ok {
 		va.SetVehicles(filtered)
 	}

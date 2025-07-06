@@ -158,6 +158,7 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 		disc,
 		logger.NopLogger{},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
