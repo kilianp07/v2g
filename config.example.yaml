@@ -9,6 +9,15 @@ dispatch:
   ack_timeout_seconds: 5
   lp_first:
     "0": true # FCR
+  segments:
+    commuter:
+      dispatcher_type: "heuristic"
+    captive_fleet:
+      dispatcher_type: "lp"
+      fallback: true
+    opportunistic_charger:
+      dispatcher_type: "heuristic"
+      fallback: true
 metrics:
   prometheus_enabled: true
   prometheus_port: ":2112"
