@@ -73,3 +73,36 @@ Key metrics:
 - `mqtt_publish_success_total` / `mqtt_publish_failure_total` – MQTT publish results
 
 Configure your Prometheus scrape job to target the `/metrics` endpoint.
+
+## Secure MQTT Client
+
+The `infra/mqtt` package now provides a hardened MQTT client with TLS support,
+authentication modes, per-message QoS and automatic retry logic. Last Will
+messages can be configured to notify other components of unexpected failures.
+
+Example configuration snippet:
+
+```yaml
+mqtt:
+  broker: "ssl://broker:8883"
+  client_id: "v2g-dispatcher"
+  username: "user"
+  password: "secret"
+  ack_topic: "vehicle/+/ack"
+  use_tls: true
+  client_cert: "client.crt"
+  client_key: "client.key"
+  ca_bundle: "ca.pem"
+  auth_method: "tls"
+  qos:
+    command: 1
+    ack: 1
+  lwt_topic: "v2g/lwt"
+  lwt_payload: "offline"
+  lwt_qos: 1
+  lwt_retain: true
+  max_retries: 5
+  backoff_ms: 200
+```
+
+See `config.example.yaml` for more options.
