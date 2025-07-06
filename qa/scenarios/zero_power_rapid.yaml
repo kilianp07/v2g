@@ -1,0 +1,20 @@
+name: zero_power_rapid
+vehicles:
+  - id: v1
+    soc: 0.9
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 60
+signals:
+  - type: FCR
+    power_kw: 0
+    duration_seconds: 60
+  - type: FCR
+    power_kw: 5
+    duration_seconds: 60
+  - type: FCR
+    power_kw: 5
+    duration_seconds: 60
+expected:
+  acked: 2

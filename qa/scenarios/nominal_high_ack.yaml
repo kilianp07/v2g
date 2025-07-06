@@ -1,0 +1,20 @@
+name: nominal_high_ack
+vehicles:
+  - id: v1
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+  - id: v2
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+signals:
+  - type: FCR
+    power_kw: 20
+    duration_seconds: 300
+expected:
+  acked: 2

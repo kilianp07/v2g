@@ -1,0 +1,25 @@
+name: ack_loss_mid_dispatch
+vehicles:
+  - id: v1
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+  - id: v2
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+signals:
+  - type: FCR
+    power_kw: 10
+    duration_seconds: 100
+  - type: FCR
+    power_kw: 15
+    duration_seconds: 200
+ack_fail_after:
+  v2: 1
+expected:
+  acked: 3

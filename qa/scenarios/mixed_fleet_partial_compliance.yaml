@@ -1,0 +1,35 @@
+name: mixed_fleet_partial_compliance
+vehicles:
+  - id: v1
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+  - id: v2
+    soc: 0.7
+    is_v2g: false
+    available: true
+    max_power: 22
+    battery_kwh: 40
+  - id: v3
+    soc: 0.7
+    is_v2g: true
+    available: false
+    max_power: 22
+    battery_kwh: 40
+  - id: v4
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+signals:
+  - type: FCR
+    power_kw: 25
+    duration_seconds: 200
+fail_vehicles:
+  - v2
+  - v3
+expected:
+  acked: 2
