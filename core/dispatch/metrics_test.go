@@ -8,6 +8,7 @@ import (
 
 func TestMetricsRegistration(t *testing.T) {
 	ResetMetrics(nil)
+	t.Cleanup(func() { ResetMetrics(nil) })
 	reg := prometheus.NewRegistry()
 	MustRegisterMetrics(reg)
 	// touch metrics so they are exported

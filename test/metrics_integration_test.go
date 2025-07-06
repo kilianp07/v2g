@@ -19,6 +19,7 @@ import (
 
 func TestMetricsHTTPExposure(t *testing.T) {
 	dispatch.ResetMetrics(nil)
+	t.Cleanup(func() { dispatch.ResetMetrics(nil) })
 	reg := prometheus.NewRegistry()
 	dispatch.MustRegisterMetrics(reg)
 

@@ -5,7 +5,16 @@ import (
 )
 
 var (
-	dispatchLatency = prometheus.NewHistogramVec(
+	dispatchLatency    *prometheus.HistogramVec
+	vehiclesDispatched *prometheus.CounterVec
+	ackRate            *prometheus.GaugeVec
+	mqttSuccess        prometheus.Counter
+	mqttFailure        prometheus.Counter
+)
+
+// newCollectors creates new metric collectors.
+func newCollectors() (*prometheus.HistogramVec, *prometheus.CounterVec, *prometheus.GaugeVec, prometheus.Counter, prometheus.Counter) {
+	lat := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "dispatch_execution_latency_seconds",
 			Help:    "Latency of dispatch orders from publish to acknowledgment",
@@ -13,39 +22,39 @@ var (
 		},
 		[]string{"signal_type"},
 	)
-
-	vehiclesDispatched = prometheus.NewCounterVec(
+	veh := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "vehicles_dispatched_total",
 			Help: "Number of vehicles dispatched",
 		},
 		[]string{"signal_type"},
 	)
-
-	ackRate = prometheus.NewGaugeVec(
+	ack := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ack_rate",
 			Help: "Acknowledgment rate for dispatch orders",
 		},
 		[]string{"signal_type"},
 	)
-
-	mqttSuccess = prometheus.NewCounter(
+	suc := prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "mqtt_publish_success_total",
 			Help: "Number of successful MQTT publish operations",
 		},
 	)
-
-	mqttFailure = prometheus.NewCounter(
+	fail := prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "mqtt_publish_failure_total",
 			Help: "Number of failed MQTT publish operations",
 		},
 	)
-)
+	return lat, veh, ack, suc, fail
+}
 
-func init() { MustRegisterMetrics(nil) }
+func init() {
+	dispatchLatency, vehiclesDispatched, ackRate, mqttSuccess, mqttFailure = newCollectors()
+	MustRegisterMetrics(nil)
+}
 
 // MustRegisterMetrics registers dispatch metrics on the provided registry.
 // If reg is nil, prometheus.DefaultRegisterer is used.
@@ -59,40 +68,7 @@ func MustRegisterMetrics(reg prometheus.Registerer) {
 // ResetMetrics reinitializes metrics collectors for testing purposes and
 // registers them on the provided registry if not nil.
 func ResetMetrics(reg prometheus.Registerer) {
-	dispatchLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "dispatch_execution_latency_seconds",
-			Help:    "Latency of dispatch orders from publish to acknowledgment",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"signal_type"},
-	)
-	vehiclesDispatched = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "vehicles_dispatched_total",
-			Help: "Number of vehicles dispatched",
-		},
-		[]string{"signal_type"},
-	)
-	ackRate = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "ack_rate",
-			Help: "Acknowledgment rate for dispatch orders",
-		},
-		[]string{"signal_type"},
-	)
-	mqttSuccess = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "mqtt_publish_success_total",
-			Help: "Number of successful MQTT publish operations",
-		},
-	)
-	mqttFailure = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "mqtt_publish_failure_total",
-			Help: "Number of failed MQTT publish operations",
-		},
-	)
+	dispatchLatency, vehiclesDispatched, ackRate, mqttSuccess, mqttFailure = newCollectors()
 	if reg != nil {
 		MustRegisterMetrics(reg)
 	}
