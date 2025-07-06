@@ -110,8 +110,10 @@ func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Dura
 	start := time.Now()
 	cmdID, err := m.publisher.SendOrder(id, power)
 	if err != nil {
+		mqttFailure.Inc()
 		return false, time.Since(start), err
 	}
+	mqttSuccess.Inc()
 	ack, err := m.publisher.WaitForAck(cmdID, m.ackTimeout)
 	return ack, time.Since(start), err
 }
@@ -153,6 +155,8 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 }
 
 // Dispatch runs the dispatch process.
+//
+//gocyclo:ignore
 func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
 	if len(vehicles) == 0 && m.discovery != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -234,9 +238,10 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 // dispatchAssignments publishes the orders concurrently and records acknowledgments.
 func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.FlexibilitySignal, recordLatency bool) []metrics.DispatchLatency {
 	var (
-		wg  sync.WaitGroup
-		mu  sync.Mutex
-		lat []metrics.DispatchLatency
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		lat      []metrics.DispatchLatency
+		ackCount int
 	)
 	update := func(id string, ack bool, err error, dur time.Duration) {
 		mu.Lock()
@@ -245,6 +250,8 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 			res.Errors[id] = err
 		}
 		res.Acknowledged[id] = err == nil && ack
+		vehiclesDispatched.WithLabelValues(signal.Type.String()).Inc()
+		dispatchLatency.WithLabelValues(signal.Type.String()).Observe(dur.Seconds())
 		if m.bus != nil {
 			m.bus.Publish(events.AckEvent{
 				VehicleID:    id,
@@ -262,6 +269,9 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 				Latency:      dur,
 			})
 		}
+		if err == nil && ack {
+			ackCount++
+		}
 	}
 	for id, power := range res.Assignments {
 		wg.Add(1)
@@ -272,6 +282,9 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 		}(id, power)
 	}
 	wg.Wait()
+	if total := len(res.Assignments); total > 0 {
+		ackRate.WithLabelValues(signal.Type.String()).Set(float64(ackCount) / float64(total))
+	}
 	return lat
 }
 

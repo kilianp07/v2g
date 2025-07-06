@@ -56,3 +56,20 @@ mgr, _ := dispatch.NewDispatchManager(
 ```
 
 The `MockPredictionEngine` returns deterministic values and is used in tests. Custom engines can be plugged in the same way.
+
+## Metrics
+
+Prometheus metrics are registered automatically when importing the `dispatch` package. Start the HTTP server to expose them:
+
+```go
+ctx := context.Background()
+go metrics.StartPromServer(ctx, ":2112")
+```
+
+Key metrics:
+- `dispatch_execution_latency_seconds` – histogram of publish-to-ack latency per signal type
+- `vehicles_dispatched_total` – counter of vehicles dispatched per signal type
+- `ack_rate` – gauge representing acknowledged ratio per dispatch
+- `mqtt_publish_success_total` / `mqtt_publish_failure_total` – MQTT publish results
+
+Configure your Prometheus scrape job to target the `/metrics` endpoint.
