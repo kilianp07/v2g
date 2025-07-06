@@ -112,3 +112,14 @@ func TestStatusHandler_NoForecast(t *testing.T) {
 		t.Fatalf("expected 1")
 	}
 }
+
+func TestStatusHandler_MethodNotAllowed(t *testing.T) {
+	store := vehiclestatus.NewMemoryStore()
+	h := NewStatusHandler(store, nil)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/vehicles/status", nil)
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405 got %d", rr.Code)
+	}
+}

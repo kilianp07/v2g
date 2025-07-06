@@ -13,6 +13,10 @@ import (
 // NewStatusHandler returns an HTTP handler exposing vehicle status data via GET /api/vehicles/status.
 func NewStatusHandler(store vehiclestatus.Store, pred prediction.PredictionEngine) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		f := vehiclestatus.Filter{
 			FleetID: r.URL.Query().Get("fleet_id"),
 			Site:    r.URL.Query().Get("site"),
