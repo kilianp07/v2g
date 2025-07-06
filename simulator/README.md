@@ -6,8 +6,14 @@ It can be started with `go run ./simulator` and accepts several command line
 options:
 
 ```
---broker        MQTT broker URL
---count         number of vehicles to simulate
+--broker           MQTT broker URL
+--count            number of vehicles to simulate
+--fleet-size       auto-generate N vehicles
+--commuter-pct     ratio of commuter vehicles (0-1)
+--disconnect-rate  per-minute disconnect probability
+--availability-file hourly availability profile JSON
+--schedule-file    optional schedule overrides
+--template-file    vehicle template overrides
 --ack-latency   fixed latency before sending the ACK (e.g. `200ms`)
 --drop-rate     probability between 0 and 1 to drop an ACK
 --capacity      battery capacity in kWh
@@ -23,6 +29,17 @@ options:
 --influx-org    InfluxDB organization
 --influx-bucket InfluxDB bucket
 ```
+
+The schedule file is a JSON object mapping vehicle IDs to RFC3339 departure
+timestamps, for example:
+
+```json
+{
+  "veh0001": "2024-01-01T09:00:00Z",
+  "veh0002": "2024-01-01T12:00:00Z"
+}
+```
+
 
 Each simulated vehicle subscribes to `vehicle/{id}/command` and, according to the
 configured strategy, publishes acknowledgments to `vehicle/{id}/ack`. It

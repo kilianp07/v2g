@@ -34,6 +34,15 @@ type SimulatedVehicle struct {
 	Interval    time.Duration
 	Metrics     metrics.MetricsSink
 
+	// Segment defines the behavioural cluster for this vehicle.
+	Segment string
+	// DisconnectRate is the per-minute probability of an unexpected drop.
+	DisconnectRate float64
+	// Availability represents hourly availability probabilities.
+	Availability [24]float64
+	// Departure forces disconnect at the given time if set.
+	Departure time.Time
+
 	mu           sync.Mutex
 	currentPower float64
 
@@ -76,6 +85,11 @@ func (v *SimulatedVehicle) Run(ctx context.Context) error {
 	go func() {
 		defer wg.Done()
 		v.batteryLoop(ctx)
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		v.availabilityLoop(ctx)
 	}()
 	broadcast := strings.TrimSuffix(v.TopicPrefix, "/") + "/fleet/discovery"
 	if token := cli.Subscribe(broadcast, 0, v.onDiscovery()); token.Wait() && token.Error() != nil {
@@ -271,4 +285,91 @@ func (v *SimulatedVehicle) batteryLoop(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// availabilityLoop disconnects and reconnects vehicles according to the
+// configured rates and hourly profile.
+func (v *SimulatedVehicle) availabilityLoop(ctx context.Context) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	var depart <-chan time.Time
+	if !v.Departure.IsZero() {
+		d := time.Until(v.Departure)
+		if d < 0 {
+			d = 0
+		}
+		depart = time.After(d)
+	}
+	for {
+		select {
+		case <-ticker.C:
+			v.handleAvailabilityTick(ctx)
+		case <-depart:
+			v.mu.Lock()
+			if v.client != nil {
+				v.client.Disconnect(250)
+				v.client = nil
+			}
+			v.mu.Unlock()
+			v.publishAvailability(false)
+			depart = nil
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (v *SimulatedVehicle) handleAvailabilityTick(ctx context.Context) {
+	hour := time.Now().Hour()
+	v.mu.Lock()
+	cli := v.client
+	v.mu.Unlock()
+	if cli != nil {
+		if v.DisconnectRate > 0 && rng.Float64() < v.DisconnectRate {
+			cli.Disconnect(250)
+			v.mu.Lock()
+			if v.client == cli {
+				v.client = nil
+			}
+			v.mu.Unlock()
+			v.publishAvailability(false)
+		}
+		return
+	}
+	if rng.Float64() >= v.Availability[hour] {
+		return
+	}
+	newCli, err := newMQTTClient(v.Broker, "sim-"+v.ID)
+	if err != nil {
+		return
+	}
+	broadcast := strings.TrimSuffix(v.TopicPrefix, "/") + "/fleet/discovery"
+	if t := newCli.Subscribe(broadcast, 0, v.onDiscovery()); t.Wait() && t.Error() != nil {
+		newCli.Disconnect(250)
+		return
+	}
+	cmdTopic := fmt.Sprintf("vehicle/%s/command", v.ID)
+	if t := newCli.Subscribe(cmdTopic, 0, v.onCommand(ctx)); t.Wait() && t.Error() != nil {
+		newCli.Disconnect(250)
+		return
+	}
+	v.mu.Lock()
+	if v.client != nil {
+		v.client.Disconnect(250)
+	}
+	v.client = newCli
+	v.mu.Unlock()
+	v.publishAvailability(true)
+}
+
+func (v *SimulatedVehicle) publishAvailability(avail bool) {
+	payload, _ := json.Marshal(struct {
+		Available bool `json:"available"`
+	}{avail})
+	if v.client == nil {
+		return
+	}
+	topic := strings.TrimSuffix(v.TopicPrefix, "/") + "/vehicle/state/" + v.ID
+	t := v.client.Publish(topic, 0, false, payload)
+	t.WaitTimeout(2 * time.Second)
 }

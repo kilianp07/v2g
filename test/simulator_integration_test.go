@@ -170,7 +170,7 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 		Duration:  time.Minute,
 		Timestamp: time.Now(),
 	}
-	res := mgr.Dispatch(sig, nil)
+	res := mgr.Dispatch(sig, vehicles)
 	if len(res.Errors) > 0 {
 		t.Fatalf("dispatch errors: %v", res.Errors)
 	}
