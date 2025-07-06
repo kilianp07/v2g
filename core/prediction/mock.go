@@ -9,7 +9,7 @@ type MockPredictionEngine struct {
 }
 
 // PredictAvailability returns the configured probability for the vehicle or 1.0.
-func (m MockPredictionEngine) PredictAvailability(id string, t time.Time) float64 {
+func (m *MockPredictionEngine) PredictAvailability(id string, t time.Time) float64 {
 	_ = t
 	if m.Availability == nil {
 		return 1
@@ -20,8 +20,8 @@ func (m MockPredictionEngine) PredictAvailability(id string, t time.Time) float6
 	return 1
 }
 
-// ForecastSoC returns the configured forecast slice for the vehicle or an empty slice.
-func (m MockPredictionEngine) ForecastSoC(id string, h time.Duration) []float64 {
+// ForecastSoC returns the configured forecast slice for the vehicle or nil if none is available.
+func (m *MockPredictionEngine) ForecastSoC(id string, h time.Duration) []float64 {
 	_ = h
 	if m.SoCForecasts == nil {
 		return nil

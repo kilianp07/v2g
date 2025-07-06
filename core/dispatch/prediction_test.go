@@ -24,7 +24,7 @@ func newTestManager(pred prediction.PredictionEngine) *DispatchManager {
 }
 
 func TestDispatchManager_UsesPrediction(t *testing.T) {
-	eng := prediction.MockPredictionEngine{
+	eng := &prediction.MockPredictionEngine{
 		Availability: map[string]float64{"v1": 1, "v2": 0.1},
 	}
 	mgr := newTestManager(eng)
