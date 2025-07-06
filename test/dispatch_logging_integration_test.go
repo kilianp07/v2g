@@ -20,7 +20,7 @@ func TestDispatchLoggingIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	dispatch.ResetMetrics(nil)
 
 	publisher := mqtt.NewMockPublisher()
@@ -44,7 +44,7 @@ func TestDispatchLoggingIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", resp.StatusCode)
 	}

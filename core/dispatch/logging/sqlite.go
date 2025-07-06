@@ -27,7 +27,9 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
         record TEXT
     );`
 	if _, err := db.Exec(schema); err != nil {
-		db.Close()
+		if cerr := db.Close(); cerr != nil {
+			return nil, fmt.Errorf("close db: %v (schema err: %w)", cerr, err)
+		}
 		return nil, err
 	}
 	return &SQLiteStore{db: db}, nil
@@ -66,7 +68,7 @@ func (s *SQLiteStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var res []LogRecord
 	for rows.Next() {
 		var data string

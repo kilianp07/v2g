@@ -19,7 +19,9 @@ func NewJSONLStore(path string) (*JSONLStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	f.Close()
+	if cerr := f.Close(); cerr != nil {
+		return nil, cerr
+	}
 	return &JSONLStore{path: path}, nil
 }
 
@@ -30,19 +32,19 @@ func (s *JSONLStore) Append(ctx context.Context, rec LogRecord) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	enc := json.NewEncoder(f)
 	return enc.Encode(rec)
 }
 
 func (s *JSONLStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	f, err := os.Open(s.path)
-	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var res []LogRecord
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

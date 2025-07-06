@@ -13,7 +13,7 @@ func TestSQLiteStore_PersistQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	rec := LogRecord{
 		Timestamp:        time.Now(),
 		Signal:           model.FlexibilitySignal{Type: model.SignalFCR},

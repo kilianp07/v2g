@@ -43,13 +43,15 @@ func (m *memStore) Close() error { return nil }
 
 func TestLogHandler_AuthAndFilters(t *testing.T) {
 	store := &memStore{}
-	store.Append(context.Background(), logging.LogRecord{
+	if err := store.Append(context.Background(), logging.LogRecord{
 		Timestamp:        time.Now(),
 		Signal:           model.FlexibilitySignal{Type: model.SignalFCR},
 		TargetPower:      1,
 		VehiclesSelected: []string{"v1"},
 		Response:         logging.Result{},
-	})
+	}); err != nil {
+		t.Fatalf("append: %v", err)
+	}
 	h := NewLogHandler(store, "tok")
 
 	req := httptest.NewRequest("GET", "/api/dispatch/logs?vehicle_id=v1", nil)
