@@ -35,9 +35,15 @@ func generateCert(t *testing.T) (certFile, keyFile, caFile string) {
 	certFile = dir + "/cert.pem"
 	keyFile = dir + "/key.pem"
 	caFile = dir + "/ca.pem"
-	os.WriteFile(certFile, certPEM, 0644)
-	os.WriteFile(keyFile, keyPEM, 0644)
-	os.WriteFile(caFile, certPEM, 0644)
+	if err := os.WriteFile(certFile, certPEM, 0644); err != nil {
+		t.Fatalf("write cert: %v", err)
+	}
+	if err := os.WriteFile(keyFile, keyPEM, 0644); err != nil {
+		t.Fatalf("write key: %v", err)
+	}
+	if err := os.WriteFile(caFile, certPEM, 0644); err != nil {
+		t.Fatalf("write ca: %v", err)
+	}
 	return
 }
 
@@ -94,7 +100,7 @@ func TestQoSSettings(t *testing.T) {
 	}
 }
 
-func TestDisconnectPublishesLWT(t *testing.T) {
+func TestLWTConfigured(t *testing.T) {
 	mc := &mockClient{}
 	newMQTTClient = func(o *paho.ClientOptions) pahoClient { mc.opts = o; return mc }
 	defer func() { newMQTTClient = func(opts *paho.ClientOptions) pahoClient { return paho.NewClient(opts) } }()
@@ -103,9 +109,15 @@ func TestDisconnectPublishesLWT(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client: %v", err)
 	}
+	if !mc.opts.WillEnabled {
+		t.Fatalf("will not enabled")
+	}
+	if mc.opts.WillTopic != "lwt" || string(mc.opts.WillPayload) != "bye" {
+		t.Fatalf("will options incorrect")
+	}
 	cli.Disconnect()
-	if len(mc.published) == 0 || mc.published[0].topic != "lwt" {
-		t.Fatalf("lwt not published")
+	if len(mc.published) != 0 {
+		t.Fatalf("unexpected publish on disconnect")
 	}
 }
 

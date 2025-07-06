@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -148,7 +148,7 @@ func (c Config) LoadTLSConfig() (*tls.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load cert: %w", err)
 	}
-	caBytes, err := ioutil.ReadFile(c.CABundle)
+	caBytes, err := os.ReadFile(c.CABundle)
 	if err != nil {
 		return nil, fmt.Errorf("read ca: %w", err)
 	}
@@ -257,11 +257,8 @@ func (p *PahoClient) WaitForAck(commandID string, timeout time.Duration) (bool, 
 	}
 }
 
-// Disconnect publishes the configured LWT and closes the MQTT connection.
+// Disconnect gracefully closes the MQTT connection.
 func (p *PahoClient) Disconnect() {
-	if p.lwtTopic != "" && p.lwtPayload != "" {
-		_ = p.cli.Publish(p.lwtTopic, p.lwtQoS, p.lwtRetain, p.lwtPayload)
-	}
 	if p.cli != nil && p.cli.IsConnected() {
 		p.cli.Disconnect(250)
 	}
