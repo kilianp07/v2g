@@ -13,6 +13,7 @@ import (
 	"github.com/kilianp07/v2g/core/model"
 	"github.com/kilianp07/v2g/core/mqtt"
 	"github.com/kilianp07/v2g/core/prediction"
+	vehiclestatus "github.com/kilianp07/v2g/core/vehiclestatus"
 	"github.com/kilianp07/v2g/internal/eventbus"
 )
 
@@ -31,6 +32,7 @@ type DispatchManager struct {
 	tuner        LearningTuner
 	prediction   prediction.PredictionEngine
 	store        logging.LogStore
+	statusStore  vehiclestatus.Store
 	history      []DispatchResult
 	mu           sync.Mutex
 }
@@ -52,6 +54,13 @@ func (m *DispatchManager) SetLPFirst(cfg map[model.SignalType]bool) {
 func (m *DispatchManager) SetLogStore(store logging.LogStore) {
 	m.mu.Lock()
 	m.store = store
+	m.mu.Unlock()
+}
+
+// SetStatusStore configures the store used to persist vehicle status information.
+func (m *DispatchManager) SetStatusStore(store vehiclestatus.Store) {
+	m.mu.Lock()
+	m.statusStore = store
 	m.mu.Unlock()
 }
 
@@ -267,6 +276,20 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 			VehiclesSelected: vids,
 			Response:         lr,
 		})
+	}
+	if m.statusStore != nil {
+		dec := vehiclestatus.LastDispatch{
+			SignalType:       signal.Type.String(),
+			TargetPower:      signal.PowerKW,
+			VehiclesSelected: make([]string, 0, len(result.Assignments)),
+			Timestamp:        signal.Timestamp,
+		}
+		for id := range result.Assignments {
+			dec.VehiclesSelected = append(dec.VehiclesSelected, id)
+		}
+		for id := range result.Assignments {
+			m.statusStore.RecordDispatch(id, dec)
+		}
 	}
 	if m.tuner != nil {
 		m.tuner.Tune(hist)

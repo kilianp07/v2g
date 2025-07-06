@@ -130,3 +130,47 @@ GET /api/dispatch/logs?start=2024-01-02T15:04:05Z&end=2024-01-02T16:00:00Z&vehic
 ```
 
 Provide the token via `Authorization: Bearer <token>` header.
+
+## Vehicle Status Endpoint
+
+`/api/vehicles/status` exposes the real-time state of each vehicle and last dispatch decision.
+Query parameters:
+
+- `fleet_id` – filter by fleet identifier
+- `site` – filter by site
+- `cluster` – filter by behavioral cluster
+
+Example request:
+
+```bash
+GET /api/vehicles/status?fleet_id=f1&site=paris
+```
+
+Response sample:
+
+```json
+[
+  {
+    "vehicle_id": "veh123",
+    "current_status": "dispatched",
+    "forecasted_plugin_window": {
+      "start": "2025-07-07T08:00:00Z",
+      "end": "2025-07-07T12:00:00Z"
+    },
+    "forecasted_soc": {
+      "t+0m": 80.5,
+      "t+15m": 78.2
+    },
+    "next_dispatch_window": {
+      "start": "...",
+      "end": "..."
+    },
+    "last_dispatch_decision": {
+      "signal_type": "FCR",
+      "target_power": 50.0,
+      "vehicles_selected": ["veh123"],
+      "timestamp": "2025-07-06T14:30:00Z"
+    }
+  }
+]
+```
