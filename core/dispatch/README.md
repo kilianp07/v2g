@@ -16,6 +16,7 @@ manager, err := dispatch.NewDispatchManager(
     nil, // FleetDiscovery
     logger.NopLogger{},
     nil, // LearningTuner
+    nil, // PredictionEngine
 )
 ```
 

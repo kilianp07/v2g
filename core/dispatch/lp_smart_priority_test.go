@@ -27,7 +27,7 @@ func TestDispatchManager_LPFirstSuccess(t *testing.T) {
 	bus := eventbus.New()
 
 	smart := &countingSmart{SmartDispatcher: NewSmartDispatcher()}
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestDispatchManager_LPFailureFallback(t *testing.T) {
 	bus := eventbus.New()
 
 	smart := &countingSmart{SmartDispatcher: NewSmartDispatcher()}
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestDispatchManager_NonStrict(t *testing.T) {
 	bus := eventbus.New()
 
 	smart := &countingSmart{SmartDispatcher: NewSmartDispatcher()}
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestDispatchManager_LPToggleOff(t *testing.T) {
 	bus := eventbus.New()
 
 	smart := &countingSmart{SmartDispatcher: NewSmartDispatcher()}
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, smart, NoopFallback{}, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}

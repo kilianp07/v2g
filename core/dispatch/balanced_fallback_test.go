@@ -79,7 +79,7 @@ func TestDispatchManager_BalancedFallback(t *testing.T) {
 	publisher.FailIDs["v1"] = true
 	fb := NewBalancedFallback(logger.NopLogger{})
 	bus := eventbus.New()
-	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, fb, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil)
+	mgr, err := NewDispatchManager(SimpleVehicleFilter{}, EqualDispatcher{}, fb, publisher, time.Second, nil, bus, nil, logger.NopLogger{}, nil, nil)
 	if err != nil {
 		t.Fatalf("manager: %v", err)
 	}

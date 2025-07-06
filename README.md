@@ -33,3 +33,26 @@ types and algorithms while infrastructure implementations live in
 Event definitions live under `core/events`.
 
 See individual package READMEs for details.
+
+## Prediction Engine
+
+`DispatchManager` can optionally use a `PredictionEngine` to forecast vehicle availability and state of charge. Provide an implementation when creating the manager to improve scoring:
+
+```go
+pred := &prediction.MockPredictionEngine{}
+mgr, _ := dispatch.NewDispatchManager(
+    dispatch.SimpleVehicleFilter{},
+    dispatch.EqualDispatcher{},
+    dispatch.NoopFallback{},
+    mqtt.NewMockPublisher(),
+    5*time.Second,
+    metrics.NopSink{},
+    eventbus.New(),
+    nil,
+    logger.NopLogger{},
+    nil,
+    pred,
+)
+```
+
+The `MockPredictionEngine` returns deterministic values and is used in tests. Custom engines can be plugged in the same way.

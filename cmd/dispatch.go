@@ -60,6 +60,7 @@ func dispatchSignal(cmd *cobra.Command, args []string) error {
 		disc,
 		logg,
 		nil,
+		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("dispatch manager: %w", err)

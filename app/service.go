@@ -72,6 +72,7 @@ func New(cfg *config.Config) (*Service, error) {
 		disc,
 		logg,
 		nil,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("dispatch manager: %w", err)
