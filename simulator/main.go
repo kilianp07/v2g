@@ -19,7 +19,7 @@ import (
 
 func main() {
 	cfg := parseFlags()
-	if err := cfg.Validate(); err != nil {
+	if err := (&cfg).Validate(); err != nil {
 		log.Fatalf("invalid config: %v", err)
 	}
 
@@ -57,6 +57,10 @@ func main() {
 		prof, err = readAvailabilityFile(cfg.AvailabilityFile)
 		if err != nil {
 			log.Fatalf("availability file: %v", err)
+		}
+	} else {
+		for i := range prof {
+			prof[i] = 1
 		}
 	}
 

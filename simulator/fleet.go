@@ -23,7 +23,7 @@ type VehicleTemplate struct {
 	Departure string `json:"departure"`
 }
 
-// GenerateFleet creates Size vehicles with IDs veh0001..vehNNNN.
+// GenerateFleet creates Size vehicles with IDs veh001..vehNNN.
 // Vehicles are assigned the "commuter" segment according to CommuterPct,
 // otherwise "opportunistic".
 func GenerateFleet(cfg FleetConfig, tmpl map[string]VehicleTemplate) []SimulatedVehicle {
@@ -32,7 +32,7 @@ func GenerateFleet(cfg FleetConfig, tmpl map[string]VehicleTemplate) []Simulated
 	}
 	vs := make([]SimulatedVehicle, cfg.Size)
 	for i := 0; i < cfg.Size; i++ {
-		id := fmt.Sprintf("veh%04d", i+1)
+		id := fmt.Sprintf("veh%03d", i+1)
 		seg := "opportunistic"
 		if cfg.CommuterPct > 0 && fleetRng.Float64() < cfg.CommuterPct {
 			seg = "commuter"
@@ -51,10 +51,12 @@ func GenerateFleet(cfg FleetConfig, tmpl map[string]VehicleTemplate) []Simulated
 		}
 		vs[i] = SimulatedVehicle{
 			ID:             id,
+			IsV2G:          true,
 			Segment:        seg,
 			DisconnectRate: cfg.DisconnectRate,
 			Availability:   cfg.Availability,
 			Departure:      dep,
+			ackCh:          make(chan command, 50),
 		}
 	}
 	return vs

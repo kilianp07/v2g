@@ -35,7 +35,7 @@ type Config struct {
 	InfluxBucket string
 }
 
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	if c.Broker == "" {
 		return fmt.Errorf("broker is required")
 	}

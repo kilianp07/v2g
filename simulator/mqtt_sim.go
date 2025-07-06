@@ -7,7 +7,15 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
+// mqttClientFactory is used to create MQTT clients. It can be swapped out in
+// tests.
+var mqttClientFactory = realMQTTClient
+
 func newMQTTClient(broker, clientID string) (paho.Client, error) {
+	return mqttClientFactory(broker, clientID)
+}
+
+func realMQTTClient(broker, clientID string) (paho.Client, error) {
 	if broker == "" || clientID == "" {
 		return nil, fmt.Errorf("broker and clientID must be provided")
 	}
