@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -58,16 +58,44 @@ func main() {
 		})
 	}
 
+	var tmpl map[string]VehicleTemplate
+	if cfg.TemplateFile != "" {
+		data, err := os.ReadFile(cfg.TemplateFile)
+		if err == nil {
+			_ = json.Unmarshal(data, &tmpl)
+		}
+	}
+	var prof [24]float64
+	if cfg.AvailabilityFile != "" {
+		data, err := os.ReadFile(cfg.AvailabilityFile)
+		if err == nil {
+			prof, _ = LoadAvailabilityProfile(data)
+		}
+	}
+	fleetCfg := FleetConfig{
+		Size:           cfg.FleetSize,
+		CommuterPct:    cfg.CommuterPct,
+		DisconnectRate: cfg.DisconnectRate,
+		Availability:   prof,
+		Schedule:       map[string]time.Time{},
+	}
+	vehicles := GenerateFleet(fleetCfg, tmpl)
 	var wg sync.WaitGroup
-	for i := 0; i < cfg.Count; i++ {
-		id := fmt.Sprintf("veh%03d", i+1)
+	for i := range vehicles {
 		b := &Battery{
 			CapacityKWh:     cfg.CapacityKWh,
 			Soc:             0.8,
 			ChargeRateKW:    cfg.ChargeRateKW,
 			DischargeRateKW: cfg.DischargeRateKW,
 		}
-		v := NewSimulatedVehicle(id, cfg.Broker, cfg.TopicPrefix, strat, b, cfg.Interval, cfg.MaxPower, sink)
+		v := &vehicles[i]
+		v.Broker = cfg.Broker
+		v.TopicPrefix = cfg.TopicPrefix
+		v.Strategy = strat
+		v.Interval = cfg.Interval
+		v.MaxPower = cfg.MaxPower
+		v.Battery = b
+		v.Metrics = sink
 		wg.Add(1)
 		go func(v *SimulatedVehicle) {
 			defer wg.Done()
@@ -83,13 +111,19 @@ func parseFlags() Config {
 	var cfg Config
 	flag.StringVar(&cfg.Broker, "broker", "tcp://localhost:1883", "MQTT broker URL")
 	flag.IntVar(&cfg.Count, "count", 1, "number of vehicles")
+	flag.IntVar(&cfg.FleetSize, "fleet-size", 0, "auto generated fleet size")
 	flag.DurationVar(&cfg.AckLatency, "ack-latency", 0, "ack latency")
 	flag.Float64Var(&cfg.DropRate, "drop-rate", 0, "ack drop rate")
+	flag.Float64Var(&cfg.DisconnectRate, "disconnect-rate", 0, "disconnect probability per minute")
 	flag.Float64Var(&cfg.CapacityKWh, "capacity", 40, "battery capacity kWh")
 	flag.Float64Var(&cfg.ChargeRateKW, "charge-rate", 7, "charge rate kW")
 	flag.Float64Var(&cfg.DischargeRateKW, "discharge-rate", 10, "discharge rate kW")
 	flag.Float64Var(&cfg.MaxPower, "max-power", 10, "vehicle max power kW")
 	flag.DurationVar(&cfg.Interval, "interval", time.Second*30, "SoC publish interval")
+	flag.Float64Var(&cfg.CommuterPct, "commuter-pct", 0, "ratio of commuter vehicles")
+	flag.StringVar(&cfg.AvailabilityFile, "availability-file", "", "hourly availability JSON")
+	flag.StringVar(&cfg.ScheduleFile, "schedule-file", "", "schedule overrides file")
+	flag.StringVar(&cfg.TemplateFile, "template-file", "", "vehicle template overrides")
 	flag.StringVar(&cfg.BatteryProfile, "battery-profile", "", "predefined battery profile (small,medium,large)")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "enable verbose logging")
 	flag.StringVar(&cfg.TopicPrefix, "topic-prefix", "v2g", "MQTT topic prefix")

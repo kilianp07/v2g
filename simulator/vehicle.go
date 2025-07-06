@@ -34,6 +34,15 @@ type SimulatedVehicle struct {
 	Interval    time.Duration
 	Metrics     metrics.MetricsSink
 
+	// Segment defines the behavioural cluster for this vehicle.
+	Segment string
+	// DisconnectRate is the per-minute probability of an unexpected drop.
+	DisconnectRate float64
+	// Availability represents hourly availability probabilities.
+	Availability [24]float64
+	// Departure forces disconnect at the given time if set.
+	Departure time.Time
+
 	mu           sync.Mutex
 	currentPower float64
 
@@ -76,6 +85,11 @@ func (v *SimulatedVehicle) Run(ctx context.Context) error {
 	go func() {
 		defer wg.Done()
 		v.batteryLoop(ctx)
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		v.availabilityLoop(ctx)
 	}()
 	broadcast := strings.TrimSuffix(v.TopicPrefix, "/") + "/fleet/discovery"
 	if token := cli.Subscribe(broadcast, 0, v.onDiscovery()); token.Wait() && token.Error() != nil {
@@ -271,4 +285,53 @@ func (v *SimulatedVehicle) batteryLoop(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// availabilityLoop disconnects and reconnects vehicles according to the
+// configured rates and hourly profile.
+func (v *SimulatedVehicle) availabilityLoop(ctx context.Context) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			hour := time.Now().Hour()
+			if v.client != nil {
+				if v.DisconnectRate > 0 && rng.Float64() < v.DisconnectRate {
+					v.client.Disconnect(250)
+					v.client = nil
+					v.publishAvailability(false)
+				}
+			} else {
+				if rng.Float64() < v.Availability[hour] {
+					cli, err := newMQTTClient(v.Broker, "sim-"+v.ID)
+					if err == nil {
+						v.client = cli
+						v.publishAvailability(true)
+					}
+				}
+			}
+			if !v.Departure.IsZero() && time.Now().After(v.Departure) {
+				if v.client != nil {
+					v.client.Disconnect(250)
+					v.client = nil
+					v.publishAvailability(false)
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (v *SimulatedVehicle) publishAvailability(avail bool) {
+	payload, _ := json.Marshal(struct {
+		Available bool `json:"available"`
+	}{avail})
+	if v.client == nil {
+		return
+	}
+	topic := strings.TrimSuffix(v.TopicPrefix, "/") + "/vehicle/state/" + v.ID
+	t := v.client.Publish(topic, 0, false, payload)
+	t.WaitTimeout(2 * time.Second)
 }

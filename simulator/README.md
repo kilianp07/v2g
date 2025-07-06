@@ -6,8 +6,14 @@ It can be started with `go run ./simulator` and accepts several command line
 options:
 
 ```
---broker        MQTT broker URL
---count         number of vehicles to simulate
+--broker           MQTT broker URL
+--count            number of vehicles to simulate
+--fleet-size       auto-generate N vehicles
+--commuter-pct     ratio of commuter vehicles (0-1)
+--disconnect-rate  per-minute disconnect probability
+--availability-file hourly availability profile JSON
+--schedule-file    optional schedule overrides
+--template-file    vehicle template overrides
 --ack-latency   fixed latency before sending the ACK (e.g. `200ms`)
 --drop-rate     probability between 0 and 1 to drop an ACK
 --capacity      battery capacity in kWh
