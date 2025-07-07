@@ -21,7 +21,10 @@ func RunScenario(t *testing.T, sc *Scenario) {
 	if err != nil {
 		t.Fatalf("prom sink: %v", err)
 	}
-	sink := sinkIf.(*metrics.PromSink)
+	sink, ok := sinkIf.(*metrics.PromSink)
+	if !ok {
+		t.Fatalf("expected *metrics.PromSink, got %T", sinkIf)
+	}
 
 	pub := mqtt.NewMockPublisher()
 	for _, id := range sc.FailVehicles {
@@ -54,6 +57,7 @@ func RunScenario(t *testing.T, sc *Scenario) {
 
 	ackCount := 0
 	activeVehicles := vehicles
+	ts := time.Unix(0, 0)
 
 	for i, sigDef := range sc.Signals {
 		for vid, after := range sc.AckFailAfter {
@@ -66,7 +70,7 @@ func RunScenario(t *testing.T, sc *Scenario) {
 				activeVehicles = removeVehicle(activeVehicles, vid)
 			}
 		}
-		res := mgr.Dispatch(sigDef.ToModel(), activeVehicles)
+		res := mgr.Dispatch(sigDef.ToModel(ts), activeVehicles)
 		for _, ok := range res.Acknowledged {
 			if ok {
 				ackCount++

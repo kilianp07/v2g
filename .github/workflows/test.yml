@@ -153,8 +153,12 @@ jobs:
             ${{ runner.os }}-go-
       - name: Install dependencies
         run: go mod download
+      - name: Make QA script executable
+        run: chmod +x qa/run_scenarios.sh
       - name: Run QA scenarios
         run: ./qa/run_scenarios.sh
+      - name: Ensure test-results directory
+        run: mkdir -p test-results
       - name: Upload QA scenario results
         uses: actions/upload-artifact@v4
         if: always()

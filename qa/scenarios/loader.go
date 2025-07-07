@@ -35,12 +35,12 @@ type SignalDef struct {
 	DurationSeconds int     `yaml:"duration_seconds"`
 }
 
-func (s SignalDef) ToModel() model.FlexibilitySignal {
+func (s SignalDef) ToModel(ts time.Time) model.FlexibilitySignal {
 	return model.FlexibilitySignal{
 		Type:      parseSignalType(s.Type),
 		PowerKW:   s.PowerKW,
 		Duration:  time.Duration(s.DurationSeconds) * time.Second,
-		Timestamp: time.Now(),
+		Timestamp: ts,
 	}
 }
 
