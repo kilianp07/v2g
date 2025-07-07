@@ -190,9 +190,10 @@ func TestGeneratePlanRedistribute(t *testing.T) {
 		if !e.TimeSlot.Equal(firstSlot) {
 			continue
 		}
-		if e.VehicleID == "v1" {
+		switch e.VehicleID {
+		case "v1":
 			p1 = e.PowerKW
-		} else if e.VehicleID == "v2" {
+		case "v2":
 			p2 = e.PowerKW
 		}
 	}

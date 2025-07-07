@@ -92,7 +92,7 @@ func (s *Scheduler) GeneratePlan(date time.Time) ([]EffacementEntry, error) {
 		return nil, errors.New("slot_duration_minutes must be positive")
 	}
 	slotDur := time.Duration(s.Config.SlotDurationMinutes) * time.Minute
-	totalSlots := int((24 * time.Hour) / slotDur)
+	totalSlots := int((24*time.Hour + slotDur - 1) / slotDur)
 	if totalSlots == 0 {
 		return nil, errors.New("slot duration too long")
 	}
