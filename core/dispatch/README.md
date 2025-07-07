@@ -59,6 +59,19 @@ If an order fails or no ACK is received before the timeout, a fallback strategy 
 | `BalancedFallback` | Redistributes residual power proportionally to remaining capacity and SoC |
 | `ProbabilisticFallback` | Uses availability probabilities and degradation factors to reallocate power |
 
+### SoC Constraints
+
+`SmartDispatcher` can enforce minimum SoC and safe-discharge thresholds before selecting vehicles. When `enable_soc_constraints` is true, only vehicles above `min_soc` are considered and power is capped so their SoC never drops below `safe_discharge_floor`. Vehicles skipped for SoC reasons are logged.
+
+Example configuration:
+
+```yaml
+dispatch:
+  enable_soc_constraints: true
+  min_soc: 0.1
+  safe_discharge_floor: 0.1
+```
+
 ### LP-First Dispatch
 
 `DispatchManager` can prioritize the `LPDispatcher` for services that require strict power compliance, such as FCR. Configure the behaviour with the `lp_first` map:

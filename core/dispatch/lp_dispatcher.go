@@ -22,7 +22,7 @@ type lpData struct {
 }
 
 func (d LPDispatcher) buildData(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx *DispatchContext) lpData {
-	cands := prepareVehicles(vehicles, signal, ctx, d.vehicleScore)
+	cands := prepareVehicles(vehicles, signal, ctx, d.vehicleScore, d.EnableSoCConstraints, d.SafeDischargeFloor)
 	data := lpData{ids: make([]string, len(cands)), scores: make([]float64, len(cands)), caps: make([]float64, len(cands))}
 	for i, c := range cands {
 		data.ids[i] = c.v.ID

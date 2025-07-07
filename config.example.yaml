@@ -9,6 +9,9 @@ dispatch:
   ack_timeout_seconds: 5
   lp_first:
     "0": true # FCR
+  enable_soc_constraints: true
+  min_soc: 0.1
+  safe_discharge_floor: 0.1
   segments:
     commuter:
       dispatcher_type: "heuristic"
