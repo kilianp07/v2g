@@ -25,16 +25,8 @@ import (
 	"github.com/kilianp07/v2g/infra/metrics"
 	"github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/rte"
+	"github.com/kilianp07/v2g/test/util"
 )
-
-type managerWrapper struct {
-	mgr      *dispatch.DispatchManager
-	vehicles []model.Vehicle
-}
-
-func (m managerWrapper) Dispatch(sig model.FlexibilitySignal, _ []model.Vehicle) dispatch.DispatchResult {
-	return m.mgr.Dispatch(sig, m.vehicles)
-}
 
 func TestRTEDispatchEndToEnd(t *testing.T) {
 	reg := prometheus.NewRegistry()
@@ -68,14 +60,18 @@ func TestRTEDispatchEndToEnd(t *testing.T) {
 		{ID: "veh1", SoC: 0.8, IsV2G: true, Available: true, MaxPower: 40, BatteryKWh: 50},
 	}
 
-	wrapper := managerWrapper{mgr: mgr, vehicles: vehicles}
+	wrapper := util.ManagerWrapper{Mgr: mgr, Vehicles: vehicles}
 	ctx, cancel := context.WithCancel(context.Background())
 	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 	go func() { _ = srv.Start(ctx) }()
-	if err := waitForRTEServer(srv, 2*time.Second); err != nil {
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), util.RTEServerTimeout)
+	if err := util.WaitForRTEServer(waitCtx, srv); err != nil {
+		waitCancel()
 		cancel()
 		t.Fatalf("server not ready: %v", err)
 	}
+	waitCancel()
 	defer cancel()
 
 	mux := http.NewServeMux()

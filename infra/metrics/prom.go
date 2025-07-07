@@ -88,3 +88,12 @@ func (s *PromSink) RecordFleetSize(size int) error {
 	}
 	return nil
 }
+
+// RecordDispatchAck records dispatch acknowledgment events.
+func (s *PromSink) RecordDispatchAck(ev coremetrics.DispatchAckEvent) error {
+	s.events.WithLabelValues(ev.VehicleID, ev.Signal.String(), strconv.FormatBool(ev.Acknowledged)).Inc()
+	if ev.Latency > 0 {
+		s.latency.WithLabelValues(ev.VehicleID, ev.Signal.String(), strconv.FormatBool(ev.Acknowledged)).Observe(ev.Latency.Seconds())
+	}
+	return nil
+}

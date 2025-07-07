@@ -3,11 +3,11 @@
 package test
 
 import (
-	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -22,7 +22,26 @@ import (
 	"github.com/kilianp07/v2g/infra/metrics"
 	"github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/internal/eventbus"
+	"github.com/kilianp07/v2g/test/util"
 )
+
+// syncBuffer is a thread-safe buffer for capturing command output
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (s *syncBuffer) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
 
 type recordingSink struct {
 	coremetrics.NopSink
@@ -70,46 +89,69 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 		t.Skip("docker not installed")
 	}
 	ctx := context.Background()
-	cont, broker := startMosquitto(ctx, t)
-	defer func() { _ = cont.Terminate(ctx) }()
+	broker, cleanup, err := util.StartMosquitto(ctx)
+	if err != nil {
+		t.Fatalf("start mosquitto: %v", err)
+	}
+	defer cleanup()
 
 	// start simulator process
 	simCtx, cancelSim := context.WithCancel(ctx)
 	defer cancelSim()
 
-	cmd := exec.CommandContext(simCtx, "go", "run", "./simulator", "--broker="+broker, "--count=1", "--verbose", "--interval=1s")
-	cmd.Dir = ".."
-
-	var simOut bytes.Buffer
-	cmd.Stdout = &simOut
-	cmd.Stderr = &simOut
-
+	cmd, simOut := setupSimulatorCommand(simCtx, broker)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start simulator: %v", err)
 	}
-
-	defer func() {
-		cancelSim()
-		done := make(chan error)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case <-time.After(5 * time.Second):
-			_ = cmd.Process.Kill()
-			t.Logf("simulator killed due to timeout. Output:\n%s", simOut.String())
-		case err := <-done:
-			if err != nil {
-				t.Logf("simulator exited with error: %v\nOutput:\n%s", err, simOut.String())
-			}
-		}
-	}()
+	defer cleanupSimulator(cancelSim, cmd, simOut, t)
 
 	time.Sleep(3 * time.Second) // Allow simulator to connect and subscribe
+	vehicles := discoverVehicles(ctx, broker, t)
+	recSink, reg, bus, collectorCancel := setupMetricsAndEventCollector(ctx, t)
+	defer collectorCancel()
+	defer bus.Close()
 
+	dispatchSignalAndVerify(ctx, broker, vehicles, recSink, reg, bus, t)
+}
+
+func setupSimulatorCommand(simCtx context.Context, broker string) (*exec.Cmd, *syncBuffer) {
+	cmd := exec.CommandContext(simCtx, "go", "run", "./simulator", "--broker="+broker, "--count=1", "--verbose", "--interval=1s")
+	cmd.Dir = ".."
+
+	// Utiliser un buffer thread-safe pour capturer la sortie
+	var simOut syncBuffer
+	cmd.Stdout = &simOut
+	cmd.Stderr = &simOut
+
+	return cmd, &simOut
+}
+
+func cleanupSimulator(cancelSim context.CancelFunc, cmd *exec.Cmd, simOut *syncBuffer, t *testing.T) {
+	cancelSim()
+	done := make(chan error)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-time.After(5 * time.Second):
+		_ = cmd.Process.Kill()
+		t.Logf("simulator killed due to timeout. Output:\n%s", simOut.String())
+	case err := <-done:
+		if err != nil {
+			t.Logf("simulator exited with error: %v\nOutput:\n%s", err, simOut.String())
+		}
+	}
+}
+
+func discoverVehicles(ctx context.Context, broker string, t *testing.T) []model.Vehicle {
 	discCfg := mqtt.Config{Broker: broker, ClientID: "tester"}
 	disc, err := mqtt.NewPahoFleetDiscovery(discCfg, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
 	if err != nil {
 		t.Fatalf("discovery init: %v", err)
 	}
+	defer func() {
+		if err := disc.Close(); err != nil {
+			t.Logf("close discovery: %v", err)
+		}
+	}()
 
 	var vehicles []model.Vehicle
 	for i := 0; i < 5; i++ {
@@ -129,6 +171,10 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 	}
 	t.Logf("discovered %d vehicles", len(vehicles))
 
+	return vehicles
+}
+
+func setupMetricsAndEventCollector(ctx context.Context, t *testing.T) (*recordingSink, *prometheus.Registry, *eventbus.Bus, context.CancelFunc) {
 	reg := prometheus.NewRegistry()
 	promSinkIf, err := metrics.NewPromSinkWithRegistry(coremetrics.Config{}, reg)
 	if err != nil {
@@ -139,13 +185,20 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 	recSink := &recordingSink{}
 	sink := metrics.NewMultiSink(promSink, recSink)
 
+	bus := eventbus.New()
+	// Créer un contexte pour le collector d'événements qui se ferme à la fin du test
+	collectorCtx, collectorCancel := context.WithCancel(ctx)
+
+	metrics.StartEventCollector(collectorCtx, bus, sink)
+
+	return recSink, reg, bus, collectorCancel
+}
+
+func dispatchSignalAndVerify(ctx context.Context, broker string, vehicles []model.Vehicle, recSink *recordingSink, reg *prometheus.Registry, bus *eventbus.Bus, t *testing.T) {
 	pub, err := mqtt.NewPahoClient(mqtt.Config{Broker: broker, ClientID: "dispatcher", AckTopic: "vehicle/+/ack"})
 	if err != nil {
 		t.Fatalf("mqtt client: %v", err)
 	}
-
-	bus := eventbus.New()
-	metrics.StartEventCollector(ctx, bus, sink)
 
 	mgr, err := dispatch.NewDispatchManager(
 		dispatch.SimpleVehicleFilter{},
@@ -153,9 +206,9 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 		dispatch.NoopFallback{},
 		pub,
 		time.Second,
-		sink,
+		recSink,
 		bus,
-		disc,
+		nil,
 		logger.NopLogger{},
 		nil,
 		nil,
@@ -180,15 +233,24 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 	metricsTS := httptest.NewServer(mux)
 	defer metricsTS.Close()
 
-	if err := waitForMetric(metricsTS.URL+"/metrics", `dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="veh001"} 1`, 10*time.Second); err != nil {
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), util.MetricTimeout)
+	defer waitCancel()
+	if err := util.WaitForMetric(waitCtx, metricsTS.URL+"/metrics", `dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="veh001"} 1`); err != nil {
 		t.Errorf("metric wait: %v", err)
+	}
+
+	// Attendre que les événements asynchrones soient traités par le collector
+	time.Sleep(100 * time.Millisecond)
+
+	// Vérifier avec un timeout que les acks ont été enregistrés
+	for i := 0; i < 50; i++ {
+		if recSink.GetAcks() > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	if recSink.GetAcks() == 0 {
 		t.Errorf("no dispatch acks recorded")
-	}
-
-	if err := disc.Close(); err != nil {
-		t.Logf("close discovery: %v", err)
 	}
 }
