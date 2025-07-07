@@ -197,3 +197,25 @@ store := eco.NewMemoryStore()
 _ = ecokpi.Backfill(store, history)
 ```
 
+
+## Day-Ahead Scheduler
+
+The `core/scheduler` package provides a simple day-ahead planning engine used for
+NEBEF notifications. Create a `Scheduler` with configuration and a vehicle pool,
+then generate a plan for a specific day:
+
+```go
+cfg := scheduler.SchedulerConfig{SlotDurationMinutes: 60, TargetEnergyKWh: 24}
+s := scheduler.Scheduler{Config: cfg, Vehicles: fleet, Availability: windows}
+plan, _ := s.GeneratePlan(time.Now())
+```
+
+Plans can be exported as JSON or CSV using the `pkg/export` helpers:
+
+```go
+var buf bytes.Buffer
+export.WriteJSON(&buf, plan)
+export.WriteCSV(&buf, plan)
+```
+
+The CSV format uses RTE-compatible headers `vehicle_id,timeslot,power_kw`.
