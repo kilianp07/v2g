@@ -1,6 +1,6 @@
 # Makefile pour V2G - Tests d'intégration et préproduction
 
-.PHONY: help test test-unit test-integration test-e2e test-critical test-all coverage clean validate-preprod
+.PHONY: help test test-unit test-integration test-e2e test-critical test-qa test-all coverage clean validate-preprod
 
 # Variables
 GO = go
@@ -44,6 +44,10 @@ test-critical: ## Exécuter les tests de scénarios critiques
 	@echo "⚡ Exécution des tests de scénarios critiques..."
 	$(GO) test -v -race -timeout=$(TIMEOUT) -run="Critical" -tags="no_containers" ./test/...
 
+test-qa: ## Exécuter les scénarios QA de dispatch
+	@echo "📝 Exécution des scénarios QA..."
+	./qa/run_scenarios.sh
+	
 test-performance: ## Exécuter les tests de performance
 	@echo "🚀 Exécution des tests de performance..."
 	$(GO) test -v -race -timeout=$(TIMEOUT) -run="Performance" ./test/...
@@ -148,7 +152,7 @@ deps: ## Vérifier et installer les dépendances
 	$(GO) mod download
 	$(GO) mod verify
 
-ci: lint test-all coverage-check ## Pipeline CI/CD complète
+ci: lint test-all test-qa coverage-check ## Pipeline CI/CD complète
 	@echo "✅ Pipeline CI/CD terminée avec succès"
 
 cd: build ## Pipeline de déploiement
