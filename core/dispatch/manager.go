@@ -75,13 +75,20 @@ func (m *DispatchManager) dispatchStrategy(v []model.Vehicle, s model.Flexibilit
 		if m.bus != nil {
 			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "lp_attempt"})
 		}
-		m.logger.Debugf("trying LP dispatch for %s", s.Type)
+		if sl, ok := m.logger.(logger.StructuredLogger); ok {
+			sl.Debugw("lp_dispatch_attempt", map[string]any{"signal": s.Type.String()})
+		} else {
+			m.logger.Debugf("trying LP dispatch for %s", s.Type)
+		}
 		asn, err := m.lpDispatcher.DispatchStrict(v, s)
 		if err == nil {
 			return asn, m.lpDispatcher
 		}
 		if m.bus != nil {
 			m.bus.Publish(events.StrategyEvent{Signal: s.Type, Action: "lp_failure", Err: err})
+		}
+		if sl, ok := m.logger.(logger.StructuredLogger); ok {
+			sl.Debugw("lp_dispatch_failed", map[string]any{"signal": s.Type.String(), "error": err.Error()})
 		}
 		m.logger.Warnf("LP dispatch failed: %v", err)
 		assignments := m.dispatcher.Dispatch(v, s)
@@ -179,6 +186,7 @@ func NewDispatchManager(filter VehicleFilter, dispatcher Dispatcher, fallback Fa
 //
 //gocyclo:ignore
 func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []model.Vehicle) DispatchResult {
+	start := time.Now()
 	if len(vehicles) == 0 && m.discovery != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -293,6 +301,9 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	}
 	if m.tuner != nil {
 		m.tuner.Tune(hist)
+	}
+	if sl, ok := m.logger.(logger.StructuredLogger); ok {
+		sl.Debugw("dispatch_complete", map[string]any{"signal": signal.Type.String(), "duration_ms": time.Since(start).Milliseconds()})
 	}
 	return result
 }

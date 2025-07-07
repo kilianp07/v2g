@@ -15,6 +15,7 @@ func TestZerologLoggerMethods(t *testing.T) {
 		t.Fatalf("nil logger")
 	}
 	l.Debugf("debug %d", 1)
+	l.Debugw("debug", map[string]any{"k": 1})
 	l.Infof("info %s", "test")
 	l.Warnf("warn")
 	l.Errorf("error")

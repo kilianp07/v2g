@@ -123,6 +123,18 @@ handler := dispatchapi.NewLogHandler(store, "secret-token")
 http.Handle("/api/dispatch/logs", handler)
 ```
 
+Logs rotate automatically when exceeding the configured size or age. Example
+configuration:
+
+```yaml
+logging:
+  backend: "jsonl" # or 'sqlite'
+  path: "dispatch.log"
+  max_size_mb: 10      # rotate after 10MB
+  max_backups: 5       # keep last 5 files
+  max_age_days: 7      # purge files older than a week
+```
+
 Query records with optional filters:
 
 ```

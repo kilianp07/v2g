@@ -19,6 +19,7 @@ type captureLogger struct {
 }
 
 func (c *captureLogger) Debugf(format string, args ...any) {}
+func (c *captureLogger) Debugw(string, map[string]any)     {}
 func (c *captureLogger) Infof(format string, args ...any) {
 	c.mu.Lock()
 	c.msgs = append(c.msgs, fmt.Sprintf(format, args...))
