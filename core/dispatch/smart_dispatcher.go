@@ -3,6 +3,7 @@ package dispatch
 import (
 	"math"
 
+	"github.com/kilianp07/v2g/core/logger"
 	"github.com/kilianp07/v2g/core/model"
 )
 
@@ -11,17 +12,21 @@ import (
 // weights can be tuned and dynamically adapted based on the signal type. A
 // participation score allows fairness between vehicles.
 type SmartDispatcher struct {
-	SocWeight          float64
-	TimeWeight         float64
-	PriorityWeight     float64
-	PriceWeight        float64
-	WearWeight         float64
-	FairnessWeight     float64
-	AvailabilityWeight float64
-	MarketPrice        float64
-	Participation      map[string]float64
-	MaxRounds          int
-	scores             map[string]float64
+	SocWeight            float64
+	TimeWeight           float64
+	PriorityWeight       float64
+	PriceWeight          float64
+	WearWeight           float64
+	FairnessWeight       float64
+	AvailabilityWeight   float64
+	MarketPrice          float64
+	Participation        map[string]float64
+	MaxRounds            int
+	scores               map[string]float64
+	EnableSoCConstraints bool
+	MinSoC               float64
+	SafeDischargeFloor   float64
+	Logger               logger.Logger
 }
 
 type candidate struct {
@@ -30,23 +35,54 @@ type candidate struct {
 	capacity float64
 }
 
-func (d SmartDispatcher) buildCandidates(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx *DispatchContext) []candidate {
-	return prepareVehicles(vehicles, signal, ctx, d.vehicleScore)
+func (d SmartDispatcher) filterBySoC(vehicles []model.Vehicle, signal model.FlexibilitySignal) ([]model.Vehicle, []model.Vehicle) {
+	if !d.EnableSoCConstraints {
+		return vehicles, nil
+	}
+	var eligible []model.Vehicle
+	var excluded []model.Vehicle
+	for _, v := range vehicles {
+		if v.SoC < d.MinSoC || v.BatteryKWh <= 0 {
+			excluded = append(excluded, v)
+			continue
+		}
+		energy, cap := availableEnergyAndCapacity(v, signal, true, d.SafeDischargeFloor)
+		if signal.PowerKW < 0 && energy <= 0 {
+			excluded = append(excluded, v)
+			continue
+		}
+		// When only one vehicle is available and it cannot meet the full
+		// request, skip it so fallback strategies can handle the deficit.
+		if len(vehicles) == 1 && cap < math.Abs(signal.PowerKW) {
+			excluded = append(excluded, v)
+			continue
+		}
+		eligible = append(eligible, v)
+	}
+	return eligible, excluded
+}
+
+func (d SmartDispatcher) buildCandidates(vehicles []model.Vehicle, signal model.FlexibilitySignal, ctx *DispatchContext) ([]candidate, []model.Vehicle) {
+	eligible, excluded := d.filterBySoC(vehicles, signal)
+	return prepareVehicles(eligible, signal, ctx, d.vehicleScore, d.EnableSoCConstraints, d.SafeDischargeFloor), excluded
 }
 
 // NewSmartDispatcher returns a dispatcher with sensible default weights.
 func NewSmartDispatcher() SmartDispatcher {
 	return SmartDispatcher{
-		SocWeight:          0.5,
-		TimeWeight:         0.3,
-		PriorityWeight:     0.1,
-		PriceWeight:        0.05,
-		WearWeight:         0.05,
-		FairnessWeight:     0.05,
-		AvailabilityWeight: 0.1,
-		Participation:      make(map[string]float64),
-		MaxRounds:          10,
-		scores:             make(map[string]float64),
+		SocWeight:            0.5,
+		TimeWeight:           0.3,
+		PriorityWeight:       0.1,
+		PriceWeight:          0.05,
+		WearWeight:           0.05,
+		FairnessWeight:       0.05,
+		AvailabilityWeight:   0.1,
+		Participation:        make(map[string]float64),
+		MaxRounds:            10,
+		scores:               make(map[string]float64),
+		EnableSoCConstraints: true,
+		MinSoC:               0.1,
+		SafeDischargeFloor:   0.1,
 	}
 }
 
@@ -112,6 +148,8 @@ func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) flo
 }
 
 // Dispatch implements the Dispatcher interface using the greedy weighted scores.
+//
+//gocyclo:ignore
 func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
 	assignments := make(map[string]float64)
 	if len(vehicles) == 0 || signal.PowerKW == 0 {
@@ -120,7 +158,13 @@ func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexib
 
 	ctx := &DispatchContext{Signal: signal, Now: signal.Timestamp, MarketPrice: d.MarketPrice, ParticipationScore: d.Participation}
 
-	list := d.buildCandidates(vehicles, signal, ctx)
+	list, excluded := d.buildCandidates(vehicles, signal, ctx)
+	if d.Logger != nil {
+		for _, v := range excluded {
+			d.Logger.Infof("vehicle %s skipped due to SoC %.2f", v.ID, v.SoC)
+		}
+	}
+	candCopy := append([]candidate(nil), list...)
 	d.scores = make(map[string]float64, len(list))
 	for _, c := range list {
 		d.scores[c.v.ID] = c.score
@@ -148,6 +192,13 @@ func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexib
 			break
 		}
 		rounds++
+	}
+	if d.Logger != nil {
+		for _, c := range candCopy {
+			if p, ok := assignments[c.v.ID]; ok && p != 0 {
+				d.Logger.Infof("vehicle %s selected soc=%.2f power=%.2f", c.v.ID, c.v.SoC, p)
+			}
+		}
 	}
 	return assignments
 }
