@@ -31,6 +31,14 @@ func (l *ZerologLogger) Debugf(format string, args ...any) {
 	l.log.Debug().Msgf(format, args...)
 }
 
+func (l *ZerologLogger) Debugw(msg string, fields map[string]any) {
+	ev := l.log.Debug()
+	for k, v := range fields {
+		ev = ev.Interface(k, v)
+	}
+	ev.Msg(msg)
+}
+
 func (l *ZerologLogger) Infof(format string, args ...any) {
 	l.log.Info().Msgf(format, args...)
 }

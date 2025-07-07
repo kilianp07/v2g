@@ -161,6 +161,9 @@ func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexib
 	list, excluded := d.buildCandidates(vehicles, signal, ctx)
 	if d.Logger != nil {
 		for _, v := range excluded {
+			if sl, ok := d.Logger.(logger.StructuredLogger); ok {
+				sl.Debugw("soc_excluded", map[string]any{"vehicle": v.ID, "soc": v.SoC})
+			}
 			d.Logger.Infof("vehicle %s skipped due to SoC %.2f", v.ID, v.SoC)
 		}
 	}
@@ -196,6 +199,9 @@ func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.Flexib
 	if d.Logger != nil {
 		for _, c := range candCopy {
 			if p, ok := assignments[c.v.ID]; ok && p != 0 {
+				if sl, ok := d.Logger.(logger.StructuredLogger); ok {
+					sl.Debugw("vehicle_selected", map[string]any{"vehicle": c.v.ID, "score": c.score, "power": p})
+				}
 				d.Logger.Infof("vehicle %s selected soc=%.2f power=%.2f", c.v.ID, c.v.SoC, p)
 			}
 		}
