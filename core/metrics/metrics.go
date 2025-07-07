@@ -9,6 +9,8 @@ import (
 // DispatchResult represents a per-vehicle dispatch event to be recorded.
 type DispatchResult struct {
 	Signal       model.FlexibilitySignal
+	StartTime    time.Time
+	EndTime      time.Time
 	VehicleID    string
 	PowerKW      float64
 	Score        float64

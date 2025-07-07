@@ -174,3 +174,26 @@ Response sample:
   }
 ]
 ```
+
+## Ecological KPIs
+
+The metrics module computes per-vehicle ecological indicators. Configure an emission factor in `config.yaml`:
+
+```yaml
+metrics:
+  emission_factor: 50 # gCO2 per kWh
+```
+
+Prometheus exposes gauges `vehicle_injected_energy_kwh`, `vehicle_co2_avoided_grams`, and `vehicle_energy_ratio` labelled by vehicle and day. The REST endpoint exposes aggregated KPIs:
+
+```bash
+GET /api/vehicles/{id}/kpis?start=2025-07-01T00:00:00Z&end=2025-07-07T00:00:00Z
+```
+
+Use the backfill job to populate historical data from dispatch logs:
+
+```go
+store := eco.NewMemoryStore()
+_ = ecokpi.Backfill(store, history)
+```
+

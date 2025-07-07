@@ -370,6 +370,8 @@ func (m *DispatchManager) recordMetrics(res DispatchResult, lat []metrics.Dispat
 	for vid, p := range res.Assignments {
 		recs = append(recs, metrics.DispatchResult{
 			Signal:       res.Signal,
+			StartTime:    res.Signal.Timestamp,
+			EndTime:      res.Signal.Timestamp.Add(res.Signal.Duration),
 			VehicleID:    vid,
 			PowerKW:      p,
 			Score:        res.Scores[vid],
