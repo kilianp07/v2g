@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+//nolint:gocyclo
 func TestLoad(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -24,7 +25,8 @@ dispatch:
     captive_fleet:
       dispatcher_type: "lp"
 metrics:
-  prometheus_enabled: false
+  sinks:
+    - type: "nop"
 rte:
   mode: "mock"
   mock:
@@ -40,37 +42,27 @@ rte:
 	if err != nil {
 		t.Fatalf("load error: %v", err)
 	}
-	if cfg.MQTT.Broker != "tcp://localhost:1883" {
-		t.Errorf("broker mismatch: %s", cfg.MQTT.Broker)
+	checks := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"broker", cfg.MQTT.Broker, "tcp://localhost:1883"},
+		{"client_id", cfg.MQTT.ClientID, "cli"},
+		{"username", cfg.MQTT.Username, "user"},
+		{"password", cfg.MQTT.Password, "pass"},
+		{"ack_topic", cfg.MQTT.AckTopic, "vehicle/+/ack"},
+		{"use_tls", cfg.MQTT.UseTLS, false},
+		{"ack_timeout_seconds", cfg.Dispatch.AckTimeoutSeconds, 3},
+		{"segment", cfg.Dispatch.Segments["captive_fleet"].DispatcherType, "lp"},
+		{"metrics_sink", len(cfg.Metrics.Sinks) == 1 && cfg.Metrics.Sinks[0].Type == "nop", true},
+		{"rte.mode", cfg.RTE.Mode, "mock"},
+		{"rte.mock.address", cfg.RTE.Mock.Address, ":9090"},
+		{"rte.client.poll_interval_seconds", cfg.RTE.Client.PollIntervalSeconds, 60},
 	}
-	if cfg.MQTT.ClientID != "cli" {
-		t.Errorf("client_id mismatch: %s", cfg.MQTT.ClientID)
-	}
-	if cfg.MQTT.Username != "user" {
-		t.Errorf("username mismatch: %s", cfg.MQTT.Username)
-	}
-	if cfg.MQTT.Password != "pass" {
-		t.Errorf("password mismatch: %s", cfg.MQTT.Password)
-	}
-	if cfg.MQTT.AckTopic != "vehicle/+/ack" {
-		t.Errorf("ack_topic mismatch: %s", cfg.MQTT.AckTopic)
-	}
-	if cfg.MQTT.UseTLS {
-		t.Errorf("use_tls mismatch: expected false")
-	}
-	if cfg.Dispatch.AckTimeoutSeconds != 3 {
-		t.Errorf("ack_timeout_seconds mismatch: %d", cfg.Dispatch.AckTimeoutSeconds)
-	}
-	if cfg.Dispatch.Segments["captive_fleet"].DispatcherType != "lp" {
-		t.Errorf("segment not parsed")
-	}
-	if cfg.RTE.Mode != "mock" {
-		t.Errorf("rte.mode mismatch: %s", cfg.RTE.Mode)
-	}
-	if cfg.RTE.Mock.Address != ":9090" {
-		t.Errorf("rte.mock.address mismatch: %s", cfg.RTE.Mock.Address)
-	}
-	if cfg.RTE.Client.PollIntervalSeconds != 60 {
-		t.Errorf("rte.client.poll_interval_seconds mismatch: %d", cfg.RTE.Client.PollIntervalSeconds)
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("%s mismatch: %v", c.name, c.got)
+		}
 	}
 }

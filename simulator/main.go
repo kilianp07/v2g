@@ -34,13 +34,7 @@ func main() {
 	strat := RandomAck{Delay: cfg.AckLatency, DropRate: cfg.DropRate}
 	var sink coremetrics.MetricsSink = coremetrics.NopSink{}
 	if cfg.InfluxURL != "" {
-		sink = metrics.NewInfluxSinkWithFallback(coremetrics.Config{
-			InfluxEnabled: true,
-			InfluxURL:     cfg.InfluxURL,
-			InfluxToken:   cfg.InfluxToken,
-			InfluxOrg:     cfg.InfluxOrg,
-			InfluxBucket:  cfg.InfluxBucket,
-		})
+		sink = metrics.NewInfluxSinkWithFallback(cfg.InfluxURL, cfg.InfluxToken, cfg.InfluxOrg, cfg.InfluxBucket)
 	}
 
 	var tmpl map[string]VehicleTemplate

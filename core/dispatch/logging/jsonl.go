@@ -37,6 +37,7 @@ func (s *JSONLStore) Append(ctx context.Context, rec LogRecord) error {
 	return enc.Encode(rec)
 }
 
+//gocyclo:ignore
 func (s *JSONLStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

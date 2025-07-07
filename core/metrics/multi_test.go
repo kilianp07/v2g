@@ -1,21 +1,19 @@
 package metrics
 
-import (
-	"testing"
+import "testing"
 
-	coremetrics "github.com/kilianp07/v2g/core/metrics"
-)
+// TestMultiSink ensures events are forwarded to all sinks.
 
 type recordSink struct {
 	count int
 }
 
-func (r *recordSink) RecordDispatchResult([]coremetrics.DispatchResult) error {
+func (r *recordSink) RecordDispatchResult([]DispatchResult) error {
 	r.count++
 	return nil
 }
 
-func (r *recordSink) RecordDispatchLatency([]coremetrics.DispatchLatency) error {
+func (r *recordSink) RecordDispatchLatency([]DispatchLatency) error {
 	r.count++
 	return nil
 }

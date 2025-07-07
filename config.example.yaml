@@ -22,13 +22,11 @@ dispatch:
       dispatcher_type: "heuristic"
       fallback: true
 metrics:
-  prometheus_enabled: true
-  prometheus_port: ":2112"
-  influx_enabled: true
-  influx_url: "http://influxdb:8086"
-  influx_token: "secret"
-  influx_org: "my-org"
-  influx_bucket: "v2g"
+  sinks:
+    - type: "prometheus"
+      conf:
+        prometheus_port: ":2112"
+  # additional sinks can be listed here
   emission_factor: 50 # gCO2 per kWh
 logging:
   backend: "jsonl" # or 'sqlite'
