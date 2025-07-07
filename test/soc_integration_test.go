@@ -30,6 +30,9 @@ func (c *captureLogger) Errorf(format string, args ...any) { c.Infof(format, arg
 func TestIntegration_SoCConstraints(t *testing.T) {
 	log := &captureLogger{}
 	disp := dispatch.NewSmartDispatcher()
+	disp.EnableSoCConstraints = true
+	disp.MinSoC = 0.1
+	disp.SafeDischargeFloor = 0.1
 	disp.Logger = log
 	pub := mqtt.NewMockPublisher()
 	mgr, err := dispatch.NewDispatchManager(dispatch.SimpleVehicleFilter{}, &disp, dispatch.NoopFallback{}, pub, time.Second, nil, nil, nil, logger.NopLogger{}, nil, nil)

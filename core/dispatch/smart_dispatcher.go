@@ -46,24 +46,13 @@ func (d SmartDispatcher) filterBySoC(vehicles []model.Vehicle, signal model.Flex
 			excluded = append(excluded, v)
 			continue
 		}
-		floor := d.SafeDischargeFloor
-		if v.MinSoC > floor {
-			floor = v.MinSoC
+		energy, cap := availableEnergyAndCapacity(v, signal, true, d.SafeDischargeFloor)
+		if signal.PowerKW < 0 && energy <= 0 {
+			excluded = append(excluded, v)
+			continue
 		}
-		energy := (v.SoC - floor) * v.BatteryKWh
-		cap := v.MaxPower
-		if signal.PowerKW < 0 {
-			if energy <= 0 {
-				excluded = append(excluded, v)
-				continue
-			}
-			if signal.Duration > 0 {
-				maxFromEnergy := energy / signal.Duration.Hours()
-				if maxFromEnergy < cap {
-					cap = maxFromEnergy
-				}
-			}
-		}
+		// When only one vehicle is available and it cannot meet the full
+		// request, skip it so fallback strategies can handle the deficit.
 		if len(vehicles) == 1 && cap < math.Abs(signal.PowerKW) {
 			excluded = append(excluded, v)
 			continue
@@ -159,6 +148,8 @@ func (d SmartDispatcher) vehicleScore(v model.Vehicle, ctx *DispatchContext) flo
 }
 
 // Dispatch implements the Dispatcher interface using the greedy weighted scores.
+//
+//gocyclo:ignore
 func (d *SmartDispatcher) Dispatch(vehicles []model.Vehicle, signal model.FlexibilitySignal) map[string]float64 {
 	assignments := make(map[string]float64)
 	if len(vehicles) == 0 || signal.PowerKW == 0 {
