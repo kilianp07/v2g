@@ -3,6 +3,7 @@ package scheduler
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/kilianp07/v2g/core/model"
@@ -27,6 +28,63 @@ type Scheduler struct {
 	Availability map[string][]AvailabilityWindow
 }
 
+func (s *Scheduler) availableVehicles(ts time.Time, d time.Duration) []model.Vehicle {
+	var res []model.Vehicle
+	for _, v := range s.Vehicles {
+		if s.vehicleAvailable(v.ID, ts, d) {
+			res = append(res, v)
+		}
+	}
+	return res
+}
+
+func distribute(ts time.Time, vehicles []model.Vehicle, target float64) []EffacementEntry {
+	sort.Slice(vehicles, func(i, j int) bool { return vehicles[i].MaxPower > vehicles[j].MaxPower })
+	remaining := target
+	alloc := make([]float64, len(vehicles))
+	for remaining > 1e-6 {
+		active := 0
+		for i, v := range vehicles {
+			if alloc[i] < v.MaxPower {
+				active++
+			}
+		}
+		if active == 0 {
+			break
+		}
+		share := remaining / float64(active)
+		progress := false
+		for i, v := range vehicles {
+			if alloc[i] >= v.MaxPower {
+				continue
+			}
+			give := share
+			if alloc[i]+give > v.MaxPower {
+				give = v.MaxPower - alloc[i]
+			}
+			if give <= 0 {
+				continue
+			}
+			alloc[i] += give
+			remaining -= give
+			progress = true
+			if remaining <= 1e-6 {
+				break
+			}
+		}
+		if !progress {
+			break
+		}
+	}
+	var entries []EffacementEntry
+	for i, v := range vehicles {
+		if alloc[i] > 0 {
+			entries = append(entries, EffacementEntry{VehicleID: v.ID, TimeSlot: ts, PowerKW: alloc[i]})
+		}
+	}
+	return entries
+}
+
 // GeneratePlan builds an effacement plan for the given day.
 // It returns one entry per vehicle and timeslot.
 func (s *Scheduler) GeneratePlan(date time.Time) ([]EffacementEntry, error) {
@@ -44,40 +102,44 @@ func (s *Scheduler) GeneratePlan(date time.Time) ([]EffacementEntry, error) {
 		return nil, errors.New("target energy must be positive")
 	}
 
+	if len(s.Vehicles) == 0 {
+		return nil, errors.New("no vehicles configured")
+	}
+
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	var entries []EffacementEntry
+	backlog := 0.0 // kWh
+	hadAvail := false
 
 	for i := 0; i < totalSlots; i++ {
 		ts := startOfDay.Add(time.Duration(i) * slotDur)
-		var available []model.Vehicle
-		for _, v := range s.Vehicles {
-			if s.vehicleAvailable(v.ID, ts, slotDur) {
-				available = append(available, v)
-			}
-		}
+		available := s.availableVehicles(ts, slotDur)
+		slotEnergy := powerPerSlot * slotDur.Hours()
 		if len(available) == 0 {
-			return nil, fmt.Errorf("no vehicles available at %v", ts)
+			backlog += slotEnergy
+			continue
 		}
+
+		hadAvail = true
 		totalCap := 0.0
 		for _, v := range available {
 			totalCap += v.MaxPower
 		}
-		if totalCap < powerPerSlot {
-			return nil, fmt.Errorf("insufficient capacity at %v", ts)
+		targetEnergy := slotEnergy + backlog
+		maxEnergy := totalCap * slotDur.Hours()
+		allocEnergy := targetEnergy
+		if allocEnergy > maxEnergy {
+			allocEnergy = maxEnergy
 		}
-		share := powerPerSlot / float64(len(available))
-		for _, v := range available {
-			p := share
-			if p > v.MaxPower {
-				p = v.MaxPower
-			}
-			entries = append(entries, EffacementEntry{
-				VehicleID: v.ID,
-				TimeSlot:  ts,
-				PowerKW:   p,
-			})
-		}
+		backlog = targetEnergy - allocEnergy
+		targetPower := allocEnergy / slotDur.Hours()
+		entries = append(entries, distribute(ts, available, targetPower)...)
 	}
+
+	if backlog > 1e-6 || !hadAvail {
+		return nil, fmt.Errorf("insufficient capacity for target energy")
+	}
+
 	return entries, nil
 }
 

@@ -144,3 +144,62 @@ func TestGeneratePlanNoVehicles(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 }
+
+func TestGeneratePlanShift(t *testing.T) {
+	date := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+	cfg := SchedulerConfig{SlotDurationMinutes: 60, TargetEnergyKWh: 2}
+	vehicles := []model.Vehicle{{ID: "v1", MaxPower: 10}}
+	avail := map[string][]AvailabilityWindow{
+		"v1": {{Start: date.Add(12 * time.Hour), End: date.Add(24 * time.Hour)}},
+	}
+	s := Scheduler{Config: cfg, Vehicles: vehicles, Availability: avail}
+	plan, err := s.GeneratePlan(date)
+	if err != nil {
+		t.Fatalf("shift: %v", err)
+	}
+	slotDur := time.Duration(cfg.SlotDurationMinutes) * time.Minute
+	total := 0.0
+	for _, e := range plan {
+		if e.TimeSlot.Before(date.Add(12 * time.Hour)) {
+			t.Fatalf("scheduled before availability")
+		}
+		total += e.PowerKW * slotDur.Hours()
+	}
+	if math.Abs(total-cfg.TargetEnergyKWh) > 1e-6 {
+		t.Fatalf("energy mismatch %.3f", total)
+	}
+}
+
+func TestGeneratePlanRedistribute(t *testing.T) {
+	date := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+	cfg := SchedulerConfig{SlotDurationMinutes: 60, TargetEnergyKWh: 12}
+	vehicles := []model.Vehicle{{ID: "v1", MaxPower: 0.2}, {ID: "v2", MaxPower: 1}}
+	avail := map[string][]AvailabilityWindow{
+		"v1": {{Start: date, End: date.Add(24 * time.Hour)}},
+		"v2": {{Start: date, End: date.Add(24 * time.Hour)}},
+	}
+	s := Scheduler{Config: cfg, Vehicles: vehicles, Availability: avail}
+	plan, err := s.GeneratePlan(date)
+	if err != nil {
+		t.Fatalf("redistribute: %v", err)
+	}
+	// look at first slot allocations
+	firstSlot := date
+	var p1, p2 float64
+	for _, e := range plan {
+		if !e.TimeSlot.Equal(firstSlot) {
+			continue
+		}
+		if e.VehicleID == "v1" {
+			p1 = e.PowerKW
+		} else if e.VehicleID == "v2" {
+			p2 = e.PowerKW
+		}
+	}
+	if math.Abs(p1-0.2) > 1e-6 {
+		t.Fatalf("v1 cap not used %.3f", p1)
+	}
+	if math.Abs(p1+p2-0.5) > 1e-6 {
+		t.Fatalf("total not redistributed %.3f", p1+p2)
+	}
+}
