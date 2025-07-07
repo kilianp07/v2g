@@ -42,6 +42,8 @@ func (s *RotatingJSONLStore) Append(ctx context.Context, rec LogRecord) error {
 }
 
 // Query reads all log files including rotated ones.
+//
+//gocyclo:ignore
 func (s *RotatingJSONLStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error) {
 	_ = ctx
 	pattern := s.path + "*"

@@ -48,6 +48,8 @@ func (s *SQLiteStore) Append(ctx context.Context, rec LogRecord) error {
 }
 
 // Query returns records matching q.
+//
+//gocyclo:ignore
 func (s *SQLiteStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error) {
 	var args []any
 	query := `SELECT record FROM dispatch_logs WHERE 1=1`

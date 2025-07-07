@@ -215,7 +215,7 @@ func setupMetricsAndEventCollector(ctx context.Context, t *testing.T) (*recordin
 	promSink := promSinkIf.(*metrics.PromSink)
 
 	recSink := &recordingSink{}
-	sink := metrics.NewMultiSink(promSink, recSink)
+	sink := coremetrics.NewMultiSink(promSink, recSink)
 
 	bus := eventbus.New()
 	// Créer un contexte pour le collector d'événements qui se ferme à la fin du test

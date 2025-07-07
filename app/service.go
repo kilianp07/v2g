@@ -18,12 +18,11 @@ import (
 
 // Service orchestrates the dispatch manager and connectors.
 type Service struct {
-	Manager     *dispatch.DispatchManager
-	Connector   rte.RTEConnector
-	bus         eventbus.EventBus
-	log         logger.Logger
-	promEnabled bool
-	promPort    string
+	Manager   *dispatch.DispatchManager
+	Connector rte.RTEConnector
+	bus       eventbus.EventBus
+	log       logger.Logger
+	promPort  string
 }
 
 // New creates a Service from the configuration.
@@ -34,25 +33,9 @@ func New(cfg *config.Config) (*Service, error) {
 		return nil, fmt.Errorf("mqtt client: %w", err)
 	}
 
-	var sinks []coremetrics.MetricsSink
-	promEnabled := cfg.Metrics.PrometheusEnabled
-	promPort := cfg.Metrics.PrometheusPort
-	if promEnabled {
-		sink, err := metrics.NewPromSink(cfg.Metrics)
-		if err != nil {
-			return nil, fmt.Errorf("prom sink: %w", err)
-		}
-		sinks = append(sinks, sink)
-	}
-	if cfg.Metrics.InfluxEnabled {
-		sink := metrics.NewInfluxSinkWithFallback(cfg.Metrics)
-		sinks = append(sinks, sink)
-	}
-	var sink coremetrics.MetricsSink
-	if len(sinks) == 1 {
-		sink = sinks[0]
-	} else if len(sinks) > 1 {
-		sink = metrics.NewMultiSink(sinks...)
+	sink, err := coremetrics.NewMetricsSink(cfg.Metrics.Sinks)
+	if err != nil {
+		return nil, fmt.Errorf("metrics sink: %w", err)
 	}
 
 	bus := eventbus.New()
@@ -79,7 +62,14 @@ func New(cfg *config.Config) (*Service, error) {
 	}
 	manager.SetLPFirst(cfg.Dispatch.LPFirst)
 
-	svc := &Service{Manager: manager, bus: bus, log: logg, promEnabled: promEnabled, promPort: promPort}
+	svc := &Service{Manager: manager, bus: bus, log: logg}
+	for _, mc := range cfg.Metrics.Sinks {
+		if mc.Type == "prometheus" {
+			if p, ok := mc.Conf["prometheus_port"].(string); ok {
+				svc.promPort = p
+			}
+		}
+	}
 	svc.Connector = rte.NewConnector(cfg.RTE, manager)
 	return svc, nil
 }
@@ -93,7 +83,7 @@ func (s *Service) Run(ctx context.Context) error {
 			s.log.Errorf("connector error: %v", err)
 		}
 	}()
-	if s.promEnabled {
+	if s.promPort != "" {
 		go func() {
 			if err := metrics.StartPromServer(ctx, s.promPort); err != nil {
 				s.log.Errorf("prom server: %v", err)

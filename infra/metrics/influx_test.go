@@ -68,13 +68,12 @@ func TestNewInfluxSinkWithFallback(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cfg := coremetrics.Config{
-		InfluxURL:    srv.URL + "/api/v2/write",
-		InfluxToken:  "tok",
-		InfluxOrg:    "org",
-		InfluxBucket: "bucket",
-	}
-	sink := NewInfluxSinkWithFallback(cfg)
+	sink := NewInfluxSinkWithFallback(
+		srv.URL+"/api/v2/write",
+		"tok",
+		"org",
+		"bucket",
+	)
 	if _, ok := sink.(*InfluxSink); ok {
 		t.Fatalf("expected NopSink on failing health check")
 	}

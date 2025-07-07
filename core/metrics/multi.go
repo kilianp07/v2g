@@ -1,24 +1,20 @@
 package metrics
 
-import (
-	"sync"
-
-	coremetrics "github.com/kilianp07/v2g/core/metrics"
-)
+import "sync"
 
 // MultiSink fanouts dispatch results to multiple sinks.
 type MultiSink struct {
 	mu    sync.Mutex
-	Sinks []coremetrics.MetricsSink
+	Sinks []MetricsSink
 }
 
 // NewMultiSink creates a MultiSink with the provided sinks.
-func NewMultiSink(sinks ...coremetrics.MetricsSink) *MultiSink {
+func NewMultiSink(sinks ...MetricsSink) *MultiSink {
 	return &MultiSink{Sinks: sinks}
 }
 
 // RecordDispatchResult forwards the record to all sinks, returning the first error encountered.
-func (m *MultiSink) RecordDispatchResult(res []coremetrics.DispatchResult) error {
+func (m *MultiSink) RecordDispatchResult(res []DispatchResult) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
@@ -30,11 +26,11 @@ func (m *MultiSink) RecordDispatchResult(res []coremetrics.DispatchResult) error
 }
 
 // RecordFleetDiscovery forwards discovery events.
-func (m *MultiSink) RecordFleetDiscovery(ev coremetrics.FleetDiscoveryEvent) error {
+func (m *MultiSink) RecordFleetDiscovery(ev FleetDiscoveryEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if rec, ok := s.(coremetrics.FleetDiscoveryRecorder); ok {
+		if rec, ok := s.(FleetDiscoveryRecorder); ok {
 			if err := rec.RecordFleetDiscovery(ev); err != nil {
 				return err
 			}
@@ -44,11 +40,11 @@ func (m *MultiSink) RecordFleetDiscovery(ev coremetrics.FleetDiscoveryEvent) err
 }
 
 // RecordVehicleState forwards vehicle snapshots.
-func (m *MultiSink) RecordVehicleState(ev coremetrics.VehicleStateEvent) error {
+func (m *MultiSink) RecordVehicleState(ev VehicleStateEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if rec, ok := s.(coremetrics.VehicleStateRecorder); ok {
+		if rec, ok := s.(VehicleStateRecorder); ok {
 			if err := rec.RecordVehicleState(ev); err != nil {
 				return err
 			}
@@ -58,11 +54,11 @@ func (m *MultiSink) RecordVehicleState(ev coremetrics.VehicleStateEvent) error {
 }
 
 // RecordDispatchOrder forwards order events.
-func (m *MultiSink) RecordDispatchOrder(ev coremetrics.DispatchOrderEvent) error {
+func (m *MultiSink) RecordDispatchOrder(ev DispatchOrderEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if rec, ok := s.(coremetrics.DispatchOrderRecorder); ok {
+		if rec, ok := s.(DispatchOrderRecorder); ok {
 			if err := rec.RecordDispatchOrder(ev); err != nil {
 				return err
 			}
@@ -72,11 +68,11 @@ func (m *MultiSink) RecordDispatchOrder(ev coremetrics.DispatchOrderEvent) error
 }
 
 // RecordDispatchAck forwards ack events.
-func (m *MultiSink) RecordDispatchAck(ev coremetrics.DispatchAckEvent) error {
+func (m *MultiSink) RecordDispatchAck(ev DispatchAckEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if rec, ok := s.(coremetrics.DispatchAckRecorder); ok {
+		if rec, ok := s.(DispatchAckRecorder); ok {
 			if err := rec.RecordDispatchAck(ev); err != nil {
 				return err
 			}
@@ -86,11 +82,11 @@ func (m *MultiSink) RecordDispatchAck(ev coremetrics.DispatchAckEvent) error {
 }
 
 // RecordFallback forwards fallback events.
-func (m *MultiSink) RecordFallback(ev coremetrics.FallbackEvent) error {
+func (m *MultiSink) RecordFallback(ev FallbackEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if rec, ok := s.(coremetrics.FallbackRecorder); ok {
+		if rec, ok := s.(FallbackRecorder); ok {
 			if err := rec.RecordFallback(ev); err != nil {
 				return err
 			}
@@ -100,11 +96,11 @@ func (m *MultiSink) RecordFallback(ev coremetrics.FallbackEvent) error {
 }
 
 // RecordRTESignal forwards RTE signal events.
-func (m *MultiSink) RecordRTESignal(ev coremetrics.RTESignalEvent) error {
+func (m *MultiSink) RecordRTESignal(ev RTESignalEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if rec, ok := s.(coremetrics.RTESignalRecorder); ok {
+		if rec, ok := s.(RTESignalRecorder); ok {
 			if err := rec.RecordRTESignal(ev); err != nil {
 				return err
 			}
@@ -114,11 +110,11 @@ func (m *MultiSink) RecordRTESignal(ev coremetrics.RTESignalEvent) error {
 }
 
 // RecordDispatchLatency forwards latency metrics when supported by the sink.
-func (m *MultiSink) RecordDispatchLatency(lat []coremetrics.DispatchLatency) error {
+func (m *MultiSink) RecordDispatchLatency(lat []DispatchLatency) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if lr, ok := s.(coremetrics.LatencyRecorder); ok {
+		if lr, ok := s.(LatencyRecorder); ok {
 			if err := lr.RecordDispatchLatency(lat); err != nil {
 				return err
 			}
@@ -132,7 +128,7 @@ func (m *MultiSink) RecordFleetSize(size int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, s := range m.Sinks {
-		if fr, ok := s.(coremetrics.FleetSizeRecorder); ok {
+		if fr, ok := s.(FleetSizeRecorder); ok {
 			if err := fr.RecordFleetSize(size); err != nil {
 				return err
 			}

@@ -38,8 +38,8 @@ func NewInfluxSink(url, token, org, bucket string) *InfluxSink {
 
 // NewInfluxSinkWithFallback tries to ping the InfluxDB instance and
 // returns a NopSink if the health check fails.
-func NewInfluxSinkWithFallback(cfg coremetrics.Config) coremetrics.MetricsSink {
-	sink := NewInfluxSink(cfg.InfluxURL, cfg.InfluxToken, cfg.InfluxOrg, cfg.InfluxBucket)
+func NewInfluxSinkWithFallback(url, token, org, bucket string) coremetrics.MetricsSink {
+	sink := NewInfluxSink(url, token, org, bucket)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	health, err := sink.client.Health(ctx)
