@@ -29,8 +29,6 @@ import (
 	"github.com/kilianp07/v2g/rte"
 )
 
-// Package util provides helper functions used by integration tests.
-
 const (
 	// Default timeouts for helper operations
 	RTEServerTimeout      = 5 * time.Second
@@ -84,8 +82,11 @@ func WaitForMetric(ctx context.Context, metricsURL, substr string) error {
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, metricsURL, nil)
 		resp, err := http.DefaultClient.Do(req)
 		if err == nil {
-			body, _ := io.ReadAll(resp.Body)
+			body, rerr := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
+			if rerr != nil {
+				return fmt.Errorf("read metrics body: %w", rerr)
+			}
 			if strings.Contains(string(body), substr) {
 				return nil
 			}

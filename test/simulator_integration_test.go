@@ -4,6 +4,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -105,7 +106,11 @@ func TestSimulatorAndDispatcherIntegration(t *testing.T) {
 	}
 	defer cleanupSimulator(cancelSim, cmd, simOut, t)
 
-	time.Sleep(3 * time.Second) // Allow simulator to connect and subscribe
+	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer waitCancel()
+	if err := waitForSimulatorReady(waitCtx, broker); err != nil {
+		t.Fatalf("simulator ready: %v", err)
+	}
 	vehicles := discoverVehicles(ctx, broker, t)
 	recSink, reg, bus, collectorCancel := setupMetricsAndEventCollector(ctx, t)
 	defer collectorCancel()
@@ -137,6 +142,33 @@ func cleanupSimulator(cancelSim context.CancelFunc, cmd *exec.Cmd, simOut *syncB
 	case err := <-done:
 		if err != nil {
 			t.Logf("simulator exited with error: %v\nOutput:\n%s", err, simOut.String())
+		}
+	}
+}
+
+func waitForSimulatorReady(ctx context.Context, broker string) error {
+	discCfg := mqtt.Config{Broker: broker, ClientID: "ready-check"}
+	disc, err := mqtt.NewPahoFleetDiscovery(discCfg, "v2g/fleet/discovery", "v2g/fleet/response/+", "hello")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := disc.Close(); err != nil {
+			fmt.Printf("close discovery: %v\n", err)
+		}
+	}()
+
+	for {
+		dctx, dcancel := context.WithTimeout(ctx, time.Second)
+		vehicles, err := disc.Discover(dctx, time.Second)
+		dcancel()
+		if err == nil && len(vehicles) > 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("simulator not ready: %w", ctx.Err())
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
 }
@@ -235,14 +267,12 @@ func dispatchSignalAndVerify(ctx context.Context, broker string, vehicles []mode
 
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), util.MetricTimeout)
 	defer waitCancel()
-	if err := util.WaitForMetric(waitCtx, metricsTS.URL+"/metrics", `dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="veh001"} 1`); err != nil {
+	metric := fmt.Sprintf(`dispatch_events_total{acknowledged="true",signal_type="FCR",vehicle_id="%s"} 1`, vehicles[0].ID)
+	if err := util.WaitForMetric(waitCtx, metricsTS.URL+"/metrics", metric); err != nil {
 		t.Errorf("metric wait: %v", err)
 	}
 
-	// Attendre que les événements asynchrones soient traités par le collector
-	time.Sleep(100 * time.Millisecond)
-
-	// Vérifier avec un timeout que les acks ont été enregistrés
+	// Wait for asynchronous events to be processed by polling for acknowledgements
 	for i := 0; i < 50; i++ {
 		if recSink.GetAcks() > 0 {
 			break
