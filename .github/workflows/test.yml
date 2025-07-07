@@ -134,6 +134,37 @@ jobs:
         with:
           name: critical-test-results
           path: test-results/
+  qa-scenarios:
+    name: Scénarios QA
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Install dependencies
+        run: go mod download
+      - name: Make QA script executable
+        run: chmod +x qa/run_scenarios.sh
+      - name: Run QA scenarios
+        run: ./qa/run_scenarios.sh
+      - name: Ensure test-results directory
+        run: mkdir -p test-results
+      - name: Upload QA scenario results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-scenario-results
+          path: test-results/
   # Analyse de couverture
   coverage:
     name: Analyse de Couverture
@@ -204,7 +235,7 @@ jobs:
   preproduction-validation:
     name: Validation Préproduction
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, e2e-tests, critical-tests, coverage, performance]
+    needs: [unit-tests, integration-tests, e2e-tests, critical-tests, qa-scenarios, coverage, performance]
     if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@v4
@@ -313,7 +344,7 @@ jobs:
     name: Résumé des Tests
     if: always()
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, e2e-tests, critical-tests, coverage, performance]
+    needs: [unit-tests, integration-tests, e2e-tests, critical-tests, qa-scenarios, coverage, performance]
     steps:
       - name: Notify on success
         if: success()

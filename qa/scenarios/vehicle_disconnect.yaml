@@ -1,0 +1,31 @@
+name: vehicle_disconnect
+vehicles:
+  - id: v1
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+  - id: v2
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+  - id: v3
+    soc: 0.7
+    is_v2g: true
+    available: true
+    max_power: 22
+    battery_kwh: 40
+signals:
+  - type: FCR
+    power_kw: 15
+    duration_seconds: 120
+  - type: FCR
+    power_kw: 15
+    duration_seconds: 120
+disconnect_after:
+  v3: 1
+expected:
+  acked: 5
