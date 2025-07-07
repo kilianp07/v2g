@@ -13,6 +13,11 @@ Go 1.20 or later is required.
 go test ./...
 ```
 
+Integration and end-to-end tests rely on helper utilities under
+`test/util`. These helpers provide functions for waiting on the mock RTE
+server, launching a Mosquitto broker for MQTT-based tests and polling
+Prometheus metrics.
+
 Copy `config.example.yaml` to `config.yaml` and adjust the MQTT credentials to
 match your broker.
 

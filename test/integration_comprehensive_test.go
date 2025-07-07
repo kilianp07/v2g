@@ -22,6 +22,7 @@ import (
 	"github.com/kilianp07/v2g/infra/mqtt"
 	"github.com/kilianp07/v2g/internal/eventbus"
 	"github.com/kilianp07/v2g/rte"
+	"github.com/kilianp07/v2g/test/util"
 )
 
 // TestComprehensiveIntegration teste tous les composants ensemble
@@ -125,14 +126,16 @@ func runIntegrationTest(t *testing.T, dispatcherType, fallbackType string, vehic
 	}
 
 	// Setup RTE mock server
-	wrapper := managerWrapper{mgr: mgr, vehicles: vehicles}
+	wrapper := util.ManagerWrapper{Mgr: mgr, Vehicles: vehicles}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 	go func() { _ = srv.Start(ctx) }()
 
-	if err := waitForRTEServer(srv, 2*time.Second); err != nil {
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), util.RTEServerTimeout)
+	defer waitCancel()
+	if err := util.WaitForRTEServer(waitCtx, srv); err != nil {
 		t.Fatalf("server not ready: %v", err)
 	}
 
@@ -317,13 +320,16 @@ func TestErrorHandlingIntegration(t *testing.T) {
 				}
 			} else {
 				// Test normal avec conditions spéciales
-				wrapper := managerWrapper{mgr: mgr, vehicles: vehicles}
+				wrapper := util.ManagerWrapper{Mgr: mgr, Vehicles: vehicles}
 				srv := rte.NewRTEServerMockWithRegistry(config.RTEMockConfig{Address: "127.0.0.1:0"}, wrapper, reg)
 				go func() { _ = srv.Start(ctx) }()
 
-				if err := waitForRTEServer(srv, 2*time.Second); err != nil {
+				waitCtx, waitCancel := context.WithTimeout(context.Background(), util.RTEServerTimeout)
+				if err := util.WaitForRTEServer(waitCtx, srv); err != nil {
+					waitCancel()
 					t.Fatalf("server not ready: %v", err)
 				}
+				waitCancel()
 
 				var signal model.FlexibilitySignal
 				if tc.invalidSignal {
