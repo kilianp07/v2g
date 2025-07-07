@@ -9,4 +9,6 @@ type Config struct {
 	InfluxToken       string `json:"influx_token"`
 	InfluxOrg         string `json:"influx_org"`
 	InfluxBucket      string `json:"influx_bucket"`
+
+	EmissionFactor float64 `json:"emission_factor"`
 }
