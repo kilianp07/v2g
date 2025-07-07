@@ -194,6 +194,8 @@ func (v *SimulatedVehicle) worker(ctx context.Context) {
 					PowerKW:   cmd.power,
 					Timestamp: cmd.received,
 				},
+				StartTime:    cmd.received,
+				EndTime:      cmd.received.Add(time.Hour),
 				VehicleID:    v.ID,
 				PowerKW:      cmd.power,
 				Acknowledged: sent,

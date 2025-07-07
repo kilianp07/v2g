@@ -387,6 +387,8 @@ func testMetricsAccuracy(t *testing.T) {
 			metricsResults = append(metricsResults, coremetrics.DispatchResult{
 				VehicleID:    vehicleID,
 				Signal:       result.Signal,
+				StartTime:    result.Signal.Timestamp,
+				EndTime:      result.Signal.Timestamp.Add(result.Signal.Duration),
 				PowerKW:      power,
 				Acknowledged: true, // Simuler l'acknowledgment
 			})

@@ -39,8 +39,9 @@ func NewEcoSink(store eco.Store, factor float64, reg prometheus.Registerer) *Eco
 // RecordDispatchResult processes dispatch results to update KPIs.
 func (s *EcoSink) RecordDispatchResult(res []core.DispatchResult) error {
 	for _, r := range res {
-		kwh := r.PowerKW * r.Signal.Duration.Hours()
-		rec := eco.Record{VehicleID: r.VehicleID, Date: r.Signal.Timestamp}
+		duration := r.EndTime.Sub(r.StartTime).Hours()
+		kwh := r.PowerKW * duration
+		rec := eco.Record{VehicleID: r.VehicleID, Date: r.StartTime}
 		if r.PowerKW >= 0 {
 			rec.InjectedKWh = kwh
 		} else {
@@ -49,8 +50,12 @@ func (s *EcoSink) RecordDispatchResult(res []core.DispatchResult) error {
 		if err := s.store.Add(rec); err != nil {
 			return err
 		}
-		dayStr := eco.Day(rec.Date).Format("2006-01-02")
-		records, _ := s.store.Query(r.VehicleID, rec.Date, rec.Date)
+		day := eco.Day(rec.Date)
+		dayStr := day.Format("2006-01-02")
+		records, err := s.store.Query(r.VehicleID, day, day)
+		if err != nil {
+			return err
+		}
 		if len(records) > 0 {
 			rr := records[0]
 			s.injected.WithLabelValues(r.VehicleID, dayStr).Set(rr.InjectedKWh)

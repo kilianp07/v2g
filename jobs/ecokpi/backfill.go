@@ -10,7 +10,7 @@ func Backfill(store eco.Store, history []dispatch.DispatchResult) error {
 	for _, h := range history {
 		for vid, p := range h.Assignments {
 			kwh := p * h.Signal.Duration.Hours()
-			rec := eco.Record{VehicleID: vid, Date: h.Signal.Timestamp}
+			rec := eco.Record{VehicleID: vid, Date: eco.Day(h.Signal.Timestamp)}
 			if p >= 0 {
 				rec.InjectedKWh = kwh
 			} else {

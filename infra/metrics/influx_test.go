@@ -28,6 +28,8 @@ func TestInfluxSink_RecordDispatchResult(t *testing.T) {
 	now := time.Now()
 	rec := coremetrics.DispatchResult{
 		Signal:       model.FlexibilitySignal{Type: model.SignalFCR, PowerKW: 10, Timestamp: now},
+		StartTime:    now,
+		EndTime:      now.Add(time.Hour),
 		VehicleID:    "veh1",
 		PowerKW:      5,
 		Score:        1.2,

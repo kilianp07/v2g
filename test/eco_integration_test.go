@@ -24,7 +24,7 @@ func TestEcoIntegration(t *testing.T) {
 	sink := infmetrics.NewEcoSink(store, 10, reg)
 
 	flex := newFlex()
-	if err := sink.RecordDispatchResult([]coremetrics.DispatchResult{{Signal: flex, VehicleID: "v1", PowerKW: 5}}); err != nil {
+	if err := sink.RecordDispatchResult([]coremetrics.DispatchResult{{Signal: flex, StartTime: flex.Timestamp, EndTime: flex.Timestamp.Add(flex.Duration), VehicleID: "v1", PowerKW: 5}}); err != nil {
 		t.Fatalf("record: %v", err)
 	}
 
