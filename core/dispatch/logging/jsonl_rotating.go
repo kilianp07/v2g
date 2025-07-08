@@ -70,24 +70,8 @@ func (s *RotatingJSONLStore) Query(ctx context.Context, q LogQuery) ([]LogRecord
 			if q.SignalType != 0 && r.Signal.Type != q.SignalType {
 				continue
 			}
-			if q.VehicleID != "" {
-				matched := false
-				for _, id := range r.VehiclesSelected {
-					if id == q.VehicleID {
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					if _, ok := r.Response.Assignments[q.VehicleID]; ok {
-						matched = true
-					} else if _, ok := r.Response.FallbackAssignments[q.VehicleID]; ok {
-						matched = true
-					}
-				}
-				if !matched {
-					continue
-				}
+			if !recordMatchesVehicle(r, q.VehicleID) {
+				continue
 			}
 			res = append(res, r)
 		}

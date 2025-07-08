@@ -140,3 +140,17 @@ func (m *MultiSink) RecordFleetSize(size int) error {
 	}
 	return nil
 }
+
+// RecordVehicleAvailability forwards availability metrics when supported by the sink.
+func (m *MultiSink) RecordVehicleAvailability(av []coremetrics.VehicleAvailability) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, s := range m.Sinks {
+		if vr, ok := s.(coremetrics.VehicleAvailabilityRecorder); ok {
+			if err := vr.RecordVehicleAvailability(av); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

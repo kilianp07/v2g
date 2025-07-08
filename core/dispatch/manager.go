@@ -204,6 +204,7 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 	}
 	filtered := m.filter.Filter(vehicles, signal)
 	if m.prediction != nil {
+		var avrecs []metrics.VehicleAvailability
 		horizon := signal.Duration
 		if horizon <= 0 {
 			horizon = time.Hour
@@ -212,6 +213,16 @@ func (m *DispatchManager) Dispatch(signal model.FlexibilitySignal, vehicles []mo
 			filtered[i].AvailabilityProb = m.prediction.PredictAvailability(v.ID, signal.Timestamp.Add(horizon))
 			if fc := m.prediction.ForecastSoC(v.ID, horizon); len(fc) > 0 {
 				filtered[i].SoC = fc[len(fc)-1]
+			}
+			avrecs = append(avrecs, metrics.VehicleAvailability{
+				VehicleID:   v.ID,
+				Probability: filtered[i].AvailabilityProb,
+				Time:        time.Now(),
+			})
+		}
+		if vr, ok := m.metrics.(metrics.VehicleAvailabilityRecorder); ok && len(avrecs) > 0 {
+			if err := vr.RecordVehicleAvailability(avrecs); err != nil {
+				m.logger.Errorf("availability metrics error: %v", err)
 			}
 		}
 	}
