@@ -40,6 +40,7 @@ type FleetDiscoveryRecorder interface {
 // VehicleStateEvent is a snapshot of a vehicle.
 type VehicleStateEvent struct {
 	Vehicle   model.Vehicle
+	FleetID   string
 	Context   string
 	Component string
 	Time      time.Time
@@ -143,3 +144,18 @@ type FleetSizeRecorder interface {
 
 // Ensure NopSink implements FleetSizeRecorder.
 func (NopSink) RecordFleetSize(int) error { return nil }
+
+// VehicleAvailability records forecasted availability probabilities for a vehicle.
+type VehicleAvailability struct {
+	VehicleID   string
+	Probability float64
+	Time        time.Time
+}
+
+// VehicleAvailabilityRecorder records availability forecasts.
+type VehicleAvailabilityRecorder interface {
+	RecordVehicleAvailability(av []VehicleAvailability) error
+}
+
+// Ensure NopSink implements VehicleAvailabilityRecorder.
+func (NopSink) RecordVehicleAvailability([]VehicleAvailability) error { return nil }

@@ -79,27 +79,8 @@ func (s *SQLiteStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error
 		if err := json.Unmarshal([]byte(data), &r); err != nil {
 			return nil, fmt.Errorf("unmarshal record: %w", err)
 		}
-		if q.VehicleID != "" {
-			matched := false
-			for _, id := range r.VehiclesSelected {
-				if id == q.VehicleID {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				if _, ok := r.Response.Assignments[q.VehicleID]; ok {
-					matched = true
-				}
-			}
-			if !matched {
-				if _, ok := r.Response.FallbackAssignments[q.VehicleID]; ok {
-					matched = true
-				}
-			}
-			if !matched {
-				continue
-			}
+		if !recordMatchesVehicle(r, q.VehicleID) {
+			continue
 		}
 		res = append(res, r)
 	}

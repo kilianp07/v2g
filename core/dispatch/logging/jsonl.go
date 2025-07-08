@@ -8,6 +8,24 @@ import (
 	"sync"
 )
 
+func recordMatchesVehicle(r LogRecord, id string) bool {
+	if id == "" {
+		return true
+	}
+	for _, vid := range r.VehiclesSelected {
+		if vid == id {
+			return true
+		}
+	}
+	if _, ok := r.Response.Assignments[id]; ok {
+		return true
+	}
+	if _, ok := r.Response.FallbackAssignments[id]; ok {
+		return true
+	}
+	return false
+}
+
 // JSONLStore stores logs in a JSONL file.
 type JSONLStore struct {
 	path string
@@ -62,24 +80,8 @@ func (s *JSONLStore) Query(ctx context.Context, q LogQuery) ([]LogRecord, error)
 		if q.SignalType != 0 && r.Signal.Type != q.SignalType {
 			continue
 		}
-		if q.VehicleID != "" {
-			matched := false
-			for _, id := range r.VehiclesSelected {
-				if id == q.VehicleID {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				if _, ok := r.Response.Assignments[q.VehicleID]; ok {
-					matched = true
-				} else if _, ok := r.Response.FallbackAssignments[q.VehicleID]; ok {
-					matched = true
-				}
-			}
-			if !matched {
-				continue
-			}
+		if !recordMatchesVehicle(r, q.VehicleID) {
+			continue
 		}
 		res = append(res, r)
 	}

@@ -267,6 +267,7 @@ func (v *SimulatedVehicle) batteryLoop(ctx context.Context) {
 						BatteryKWh: v.Battery.CapacityKWh,
 						SoC:        soc,
 					},
+					FleetID:   "",
 					Context:   "simulation",
 					Component: "simulator",
 					Time:      now,
