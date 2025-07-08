@@ -11,6 +11,7 @@ import (
 	"github.com/kilianp07/v2g/core/logger"
 	"github.com/kilianp07/v2g/core/metrics"
 	"github.com/kilianp07/v2g/core/model"
+	"github.com/kilianp07/v2g/core/monitoring"
 	"github.com/kilianp07/v2g/core/mqtt"
 	"github.com/kilianp07/v2g/core/prediction"
 	vehiclestatus "github.com/kilianp07/v2g/core/vehiclestatus"
@@ -361,7 +362,15 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 		wg.Add(1)
 		go func(id string, p float64) {
 			defer wg.Done()
+			defer monitoring.Recover()
 			ack, d, err := m.sendAndWait(id, p)
+			if err != nil {
+				monitoring.CaptureException(err, map[string]string{
+					"vehicle_id":  id,
+					"signal_type": signal.Type.String(),
+					"module":      "dispatch_manager",
+				})
+			}
 			update(id, ack, err, d)
 		}(id, power)
 	}

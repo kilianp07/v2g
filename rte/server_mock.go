@@ -12,6 +12,7 @@ import (
 
 	"github.com/kilianp07/v2g/config"
 	"github.com/kilianp07/v2g/core/model"
+	coremon "github.com/kilianp07/v2g/core/monitoring"
 	"github.com/kilianp07/v2g/infra/logger"
 )
 
@@ -98,17 +99,20 @@ func (s *RTEServerMock) handleSignal(w http.ResponseWriter, r *http.Request) {
 	var sig Signal
 	if err := json.NewDecoder(r.Body).Decode(&sig); err != nil {
 		s.failed.Inc()
+		coremon.CaptureException(err, map[string]string{"module": "rte-server"})
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 	if err := sig.Validate(); err != nil {
 		s.failed.Inc()
+		coremon.CaptureException(err, map[string]string{"module": "rte-server"})
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	fs, err := sig.ToFlexibility()
 	if err != nil {
 		s.failed.Inc()
+		coremon.CaptureException(err, map[string]string{"module": "rte-server"})
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -139,6 +143,7 @@ func (s *RTEServerMock) Start(ctx context.Context) error {
 
 	s.srv = &http.Server{Handler: mux}
 	go func() {
+		defer coremon.Recover()
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if err := s.srv.Shutdown(shutdownCtx); err != nil {
