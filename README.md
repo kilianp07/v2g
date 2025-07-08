@@ -79,6 +79,21 @@ Key metrics:
 
 Configure your Prometheus scrape job to target the `/metrics` endpoint.
 
+## Error Monitoring with Sentry
+
+Sentry can capture runtime errors and panics during simulations or production.
+Enable it by adding a `sentry` section in `config.yaml`:
+
+```yaml
+sentry:
+  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0"
+  environment: "preprod"
+  traces_sample_rate: 0.2
+  release: "v2g@0.1.0"
+```
+
+Leave the `dsn` empty to disable reporting.
+
 ## Secure MQTT Client
 
 The `infra/mqtt` package now provides a hardened MQTT client with TLS support,

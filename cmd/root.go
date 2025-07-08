@@ -6,8 +6,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
+
+	coremon "github.com/kilianp07/v2g/core/monitoring"
+	inframon "github.com/kilianp07/v2g/infra/monitoring"
 
 	"github.com/kilianp07/v2g/app"
 	"github.com/kilianp07/v2g/config"
@@ -37,6 +41,12 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	mon, err := inframon.NewSentryMonitor(cfg.Sentry)
+	if err != nil {
+		logger.New("main").Warnf("Sentry init failed: %v", err)
+	}
+	coremon.Init(mon)
+	defer coremon.Flush(2 * time.Second)
 	svc, err := app.New(cfg)
 	if err != nil {
 		return err

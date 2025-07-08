@@ -5,6 +5,7 @@ go 1.23.2
 require github.com/eclipse/paho.mqtt.golang v1.5.0
 
 require (
+	github.com/getsentry/sentry-go v0.34.1
 	github.com/google/uuid v1.6.0
 	github.com/influxdata/influxdb-client-go/v2 v2.14.0
 	github.com/knadh/koanf/parsers/json v1.0.0
@@ -99,6 +100,7 @@ require (
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	modernc.org/libc v1.65.10 // indirect

@@ -46,3 +46,8 @@ rte:
     client_secret: ""
     token_url: "https://auth.rte.com/token"
     poll_interval_seconds: 60
+sentry:
+  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0"
+  environment: "preprod"
+  traces_sample_rate: 0.2
+  release: "v2g@0.1.0"

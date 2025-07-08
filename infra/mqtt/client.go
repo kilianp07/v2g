@@ -12,6 +12,7 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 
+	coremon "github.com/kilianp07/v2g/core/monitoring"
 	coremqtt "github.com/kilianp07/v2g/core/mqtt"
 	"github.com/kilianp07/v2g/infra/logger"
 )
@@ -164,6 +165,7 @@ func (p *PahoClient) onAck(_ paho.Client, msg paho.Message) {
 	}
 	if err := json.Unmarshal(msg.Payload(), &m); err != nil {
 		p.logger.Errorf("failed to decode ack: %v", err)
+		coremon.CaptureException(err, map[string]string{"module": "mqtt"})
 		return
 	}
 	p.mu.Lock()
@@ -222,6 +224,7 @@ func (p *PahoClient) SendOrder(vehicleID string, powerKW float64) (string, error
 		time.Sleep(p.backoff * time.Duration(1<<attempt))
 	}
 	if publishErr != nil {
+		coremon.CaptureException(publishErr, map[string]string{"vehicle_id": vehicleID, "module": "mqtt"})
 		return "", publishErr
 	}
 
@@ -238,7 +241,9 @@ func (p *PahoClient) WaitForAck(commandID string, timeout time.Duration) (bool, 
 	ch := p.ackChans[commandID]
 	p.mu.Unlock()
 	if ch == nil {
-		return false, fmt.Errorf("unknown command")
+		err := fmt.Errorf("unknown command")
+		coremon.CaptureException(err, map[string]string{"module": "mqtt"})
+		return false, err
 	}
 
 	timer := time.NewTimer(timeout)

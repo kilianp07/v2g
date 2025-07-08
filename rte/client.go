@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kilianp07/v2g/config"
+	coremon "github.com/kilianp07/v2g/core/monitoring"
 	"github.com/kilianp07/v2g/infra/logger"
 )
 
@@ -44,6 +45,7 @@ func (c *RTEClient) Start(ctx context.Context) error {
 		case <-c.ticker.C:
 			if err := c.poll(ctx); err != nil {
 				c.log.Errorf("poll error: %v", err)
+				coremon.CaptureException(err, map[string]string{"module": "rte-client"})
 			}
 		}
 	}

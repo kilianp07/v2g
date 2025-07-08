@@ -22,6 +22,7 @@ type Config struct {
 	Metrics  metrics.Config  `json:"metrics"`
 	Logging  LoggingConfig   `json:"logging"`
 	RTE      RTEConfig       `json:"rte"`
+	Sentry   SentryConfig    `json:"sentry"`
 }
 
 func Load(path string) (*Config, error) {
