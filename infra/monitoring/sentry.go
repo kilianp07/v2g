@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -13,6 +14,9 @@ import (
 func NewSentryMonitor(cfg config.SentryConfig) (coremon.Monitor, error) {
 	if cfg.DSN == "" {
 		return coremon.NopMonitor{}, nil
+	}
+	if cfg.TracesSampleRate < 0 || cfg.TracesSampleRate > 1 {
+		return nil, fmt.Errorf("sentry traces_sample_rate must be between 0 and 1: %f", cfg.TracesSampleRate)
 	}
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              cfg.DSN,
