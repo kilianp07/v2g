@@ -1,0 +1,32 @@
+mqtt:
+  broker: "BROKER"
+  client_id: "test-cli"
+  ack_topic: "vehicle/+/ack"
+  use_tls: false
+dispatch:
+  ack_timeout_seconds: 2
+  lp_first:
+    "0": true
+metrics:
+  prometheus_enabled: true
+  prometheus_port: ":0"
+logging:
+  backend: "jsonl"
+  path: "test.log"
+rte:
+  mode: "mock"
+  mock:
+    address: "127.0.0.1:8092"
+components:
+  dispatcher:
+    type: "smart"
+    conf: {}
+  fallback:
+    type: "balanced"
+    conf: {}
+  tuner:
+    type: "ack"
+    conf: {}
+  metrics:
+    - type: "prometheus"
+      conf: {}

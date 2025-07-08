@@ -18,3 +18,5 @@ jobs:
         run: go mod tidy
       - name: Run tests
         run: go test -v ./...
+      - name: Run config e2e tests
+        run: go test -v ./test -run E2EConfig
