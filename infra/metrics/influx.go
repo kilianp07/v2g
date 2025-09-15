@@ -94,6 +94,13 @@ func (s *InfluxSink) RecordVehicleState(ev coremetrics.VehicleStateEvent) error 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	v := ev.Vehicle
+	status := "unavailable"
+	if v.Available {
+		status = "idle"
+		if v.Charging {
+			status = "charging"
+		}
+	}
 	p := write.NewPointWithMeasurement("vehicle_state").
 		AddTag("vehicle_id", v.ID)
 	if ev.FleetID != "" {
@@ -104,8 +111,7 @@ func (s *InfluxSink) RecordVehicleState(ev coremetrics.VehicleStateEvent) error 
 	}
 	p = p.AddTag("context", ev.Context).
 		AddField("soc", round3(v.SoC)).
-		AddField("available", v.Available).
-		AddField("charging", v.Charging).
+		AddField("status", status).
 		AddField("power_kw", round3(v.MaxPower)).
 		SetTime(ev.Time)
 	if err := s.writeAPI.WritePoint(ctx, p); err != nil {
@@ -125,56 +131,28 @@ func (s *InfluxSink) RecordVehicleState(ev coremetrics.VehicleStateEvent) error 
 func (s *InfluxSink) RecordDispatchOrder(ev coremetrics.DispatchOrderEvent) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	p := write.NewPointWithMeasurement("dispatch_order_sent").
+	p := write.NewPointWithMeasurement("dispatch_order").
 		AddTag("vehicle_id", ev.VehicleID).
 		AddTag("signal_type", signalToString(ev.Signal)).
-		AddTag("dispatch_id", ev.DispatchID).
-		AddTag("component", "dispatch_manager").
+		AddTag("order_id", ev.OrderID).
 		AddField("power_kw", round3(ev.PowerKW)).
 		AddField("score", round3(ev.Score)).
-		AddField("market_price", round3(ev.MarketPrice)).
+		AddField("accepted", ev.Accepted).
 		SetTime(ev.Time)
-	if err := s.writeAPI.WritePoint(ctx, p); err != nil {
-		return err
-	}
-	mode := "discharge"
-	if ev.PowerKW < 0 {
-		mode = "charge"
-	} else if ev.PowerKW == 0 {
-		mode = "idle"
-	}
-	p2 := write.NewPointWithMeasurement("dispatch_order_kw").
-		AddTag("vehicle_id", ev.VehicleID).
-		AddTag("signal_type", signalToString(ev.Signal)).
-		AddTag("mode", mode).
-		AddField("power_kw", round3(ev.PowerKW)).
-		SetTime(ev.Time)
-	return s.writeAPI.WritePoint(ctx, p2)
+	return s.writeAPI.WritePoint(ctx, p)
 }
 
 // RecordDispatchAck records an acknowledgment result.
 func (s *InfluxSink) RecordDispatchAck(ev coremetrics.DispatchAckEvent) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	p := write.NewPointWithMeasurement("dispatch_ack_received").
+	p := write.NewPointWithMeasurement("acknowledgment").
 		AddTag("vehicle_id", ev.VehicleID).
-		AddTag("signal_type", signalToString(ev.Signal)).
-		AddTag("acknowledged", strconv.FormatBool(ev.Acknowledged)).
-		AddTag("dispatch_id", ev.DispatchID).
-		AddTag("component", "dispatch_manager").
-		AddField("latency_ms", round3(ev.Latency.Seconds()*1000)).
-		AddField("errors", ev.Error).
-		SetTime(ev.Time)
-	if err := s.writeAPI.WritePoint(ctx, p); err != nil {
-		return err
-	}
-	p2 := write.NewPointWithMeasurement("acknowledgment").
-		AddTag("vehicle_id", ev.VehicleID).
-		AddTag("signal_type", signalToString(ev.Signal)).
-		AddField("acknowledged", ev.Acknowledged).
+		AddTag("order_id", ev.OrderID).
+		AddField("ack", ev.Acknowledged).
 		AddField("latency_ms", round3(ev.Latency.Seconds()*1000)).
 		SetTime(ev.Time)
-	return s.writeAPI.WritePoint(ctx, p2)
+	return s.writeAPI.WritePoint(ctx, p)
 }
 
 // RecordFallback records a fallback application.
@@ -198,19 +176,12 @@ func (s *InfluxSink) RecordFallback(ev coremetrics.FallbackEvent) error {
 func (s *InfluxSink) RecordRTESignal(ev coremetrics.RTESignalEvent) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	p := write.NewPointWithMeasurement("rte_signal_received").
+	p := write.NewPointWithMeasurement("signal").
 		AddTag("signal_type", signalToString(ev.Signal.Type)).
-		AddTag("component", "rte_connector").
-		AddField("power_kw", round3(ev.Signal.PowerKW)).
+		AddField("power_requested_kw", round3(ev.Signal.PowerKW)).
+		AddField("duration_s", int(ev.Signal.Duration.Seconds())).
 		SetTime(ev.Time)
-	if err := s.writeAPI.WritePoint(ctx, p); err != nil {
-		return err
-	}
-	p2 := write.NewPointWithMeasurement("signal_metadata").
-		AddTag("signal_type", signalToString(ev.Signal.Type)).
-		AddField("power_kw", round3(ev.Signal.PowerKW)).
-		SetTime(ev.Time)
-	return s.writeAPI.WritePoint(ctx, p2)
+	return s.writeAPI.WritePoint(ctx, p)
 }
 
 // LogVehicleState is a helper to record a vehicle snapshot with a context tag.

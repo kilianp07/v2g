@@ -24,6 +24,7 @@ type Service struct {
 	log         logger.Logger
 	promEnabled bool
 	promPort    string
+	metricsSink coremetrics.MetricsSink
 }
 
 // New creates a Service from the configuration.
@@ -79,13 +80,16 @@ func New(cfg *config.Config) (*Service, error) {
 	}
 	manager.SetLPFirst(cfg.Dispatch.LPFirst)
 
-	svc := &Service{Manager: manager, bus: bus, log: logg, promEnabled: promEnabled, promPort: promPort}
+	svc := &Service{Manager: manager, bus: bus, log: logg, promEnabled: promEnabled, promPort: promPort, metricsSink: sink}
 	svc.Connector = rte.NewConnector(cfg.RTE, manager)
 	return svc, nil
 }
 
 // Run starts the service and blocks until the context is cancelled.
 func (s *Service) Run(ctx context.Context) error {
+	if s.metricsSink != nil {
+		metrics.StartEventCollector(ctx, s.bus, s.metricsSink)
+	}
 	signals := make(chan model.FlexibilitySignal, 1)
 	go s.Manager.Run(ctx, signals)
 	go func() {

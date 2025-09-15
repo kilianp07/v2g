@@ -10,7 +10,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	coremetrics "github.com/kilianp07/v2g/core/metrics"
+	coremodel "github.com/kilianp07/v2g/core/model"
 	coremon "github.com/kilianp07/v2g/core/monitoring"
+	inframetrics "github.com/kilianp07/v2g/infra/metrics"
 	inframon "github.com/kilianp07/v2g/infra/monitoring"
 
 	"github.com/kilianp07/v2g/app"
@@ -19,6 +22,7 @@ import (
 )
 
 var cfgPath string
+var demoSeed bool
 
 var rootCmd = &cobra.Command{
 	Use:   "v2g",
@@ -28,6 +32,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "configuration file")
+	rootCmd.PersistentFlags().BoolVar(&demoSeed, "demo-seed", false, "write sample metrics to Influx and exit")
 }
 
 // Execute runs the CLI.
@@ -51,10 +56,27 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if demoSeed && cfg.Metrics.InfluxEnabled {
+		if err := seedDemo(cfg.Metrics); err != nil {
+			logger.New("main").Errorf("demo seed: %v", err)
+		}
+		return nil
+	}
 	defer func() {
 		if err := svc.Close(); err != nil {
 			logger.New("main").Errorf("service close: %v", err)
 		}
 	}()
 	return svc.Run(ctx)
+}
+
+func seedDemo(cfg coremetrics.Config) error {
+	sink := inframetrics.NewInfluxSink(cfg.InfluxURL, cfg.InfluxToken, cfg.InfluxOrg, cfg.InfluxBucket)
+	now := time.Now()
+	v := coremodel.Vehicle{ID: "demo-veh", SoC: 0.5, Available: true, MaxPower: 7}
+	_ = sink.RecordVehicleState(coremetrics.VehicleStateEvent{Vehicle: v, Time: now})
+	_ = sink.RecordDispatchOrder(coremetrics.DispatchOrderEvent{OrderID: "demo1", VehicleID: v.ID, Signal: coremodel.SignalFCR, PowerKW: 3.3, Score: 0.9, Accepted: true, Time: now})
+	_ = sink.RecordDispatchAck(coremetrics.DispatchAckEvent{OrderID: "demo1", VehicleID: v.ID, Signal: coremodel.SignalFCR, Acknowledged: true, Latency: 50 * time.Millisecond, Time: now.Add(50 * time.Millisecond)})
+	_ = sink.RecordRTESignal(coremetrics.RTESignalEvent{Signal: coremodel.FlexibilitySignal{Type: coremodel.SignalFCR, PowerKW: 5, Duration: time.Minute}, Time: now})
+	return nil
 }
