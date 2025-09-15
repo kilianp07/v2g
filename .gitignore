@@ -23,7 +23,7 @@ go.work.sum
 
 # env file
 .envrc
-
+.env*
 
 # VS Code
 .vscode/
@@ -35,3 +35,5 @@ coverage
 .DS_Store
 
 build
+
+config.preprod.yaml

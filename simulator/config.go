@@ -19,6 +19,12 @@ type Config struct {
 	MaxPower        float64
 	Interval        time.Duration
 
+	TelemetryPush           bool
+	TelemetryInterval       time.Duration
+	TelemetryRequestTopic   string
+	TelemetryResponsePrefix string
+	StateTopicPrefix        string
+
 	CommuterPct      float64
 	AvailabilityFile string
 	ScheduleFile     string
@@ -35,6 +41,7 @@ type Config struct {
 	InfluxBucket string
 }
 
+//gocyclo:ignore
 func (c *Config) Validate() error {
 	if c.Broker == "" {
 		return fmt.Errorf("broker is required")
@@ -61,7 +68,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("max-power must be positive")
 	}
 	if c.Interval <= 0 {
-		return fmt.Errorf("interval must be positive")
+		c.Interval = time.Second
+	}
+	if c.TelemetryInterval <= 0 {
+		c.TelemetryInterval = c.Interval
 	}
 	if c.CommuterPct < 0 || c.CommuterPct > 1 {
 		return fmt.Errorf("commuter percentage must be between 0 and 1")

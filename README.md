@@ -21,6 +21,15 @@ Prometheus metrics.
 Copy `config.example.yaml` to `config.yaml` and adjust the MQTT credentials to
 match your broker.
 
+## Telemetry
+
+The service can collect vehicle state in two modes:
+
+- **Push** – vehicles periodically publish their state to `state_topic_prefix`.
+- **Pull** – the service broadcasts on `request_topic` and awaits responses on `response_topic_prefix`.
+
+Configure the behaviour via the `telemetry` section in the config file or `K_TELEMETRY__*` environment variables.
+
 ## Package Layout
 
 - The code is progressively migrating towards a layered architecture:
