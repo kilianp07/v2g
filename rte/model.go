@@ -37,11 +37,11 @@ func (s Signal) toSignalType() (model.SignalType, error) {
 	switch s.SignalType {
 	case "FCR":
 		return model.SignalFCR, nil
-	case "aFRR":
+	case "aFRR", "aFRR_UP", "aFRR_DOWN":
 		return model.SignalAFRR, nil
 	case "MA":
 		return model.SignalMA, nil
-	case "NEBEF":
+	case "NEBEF", "DELESTAGE":
 		return model.SignalNEBEF, nil
 	default:
 		return 0, fmt.Errorf("unknown signal type: %s", s.SignalType)

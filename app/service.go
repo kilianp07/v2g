@@ -15,6 +15,7 @@ import (
 	"github.com/kilianp07/v2g/infra/telemetry"
 	"github.com/kilianp07/v2g/internal/eventbus"
 	"github.com/kilianp07/v2g/rte"
+	rtegen "github.com/kilianp07/v2g/rte/generator"
 )
 
 // Service orchestrates the dispatch manager and connectors.
@@ -27,6 +28,7 @@ type Service struct {
 	promPort    string
 	metricsSink coremetrics.MetricsSink
 	telemetry   *telemetry.Manager
+	generator   *rtegen.Generator
 }
 
 // New creates a Service from the configuration.
@@ -83,6 +85,13 @@ func New(cfg *config.Config) (*Service, error) {
 	manager.SetLPFirst(cfg.Dispatch.LPFirst)
 
 	svc := &Service{Manager: manager, bus: bus, log: logg, promEnabled: promEnabled, promPort: promPort, metricsSink: sink}
+	if cfg.RTEGenerator.Enabled {
+		var rs coremetrics.RTESignalRecorder
+		if s, ok := sink.(coremetrics.RTESignalRecorder); ok {
+			rs = s
+		}
+		svc.generator = rtegen.New(cfg.RTEGenerator, manager, bus, rs)
+	}
 	if cfg.Telemetry.Enabled {
 		var rec coremetrics.VehicleStateRecorder
 		if r, ok := sink.(coremetrics.VehicleStateRecorder); ok {
@@ -113,6 +122,9 @@ func (s *Service) Run(ctx context.Context) error {
 			s.log.Errorf("connector error: %v", err)
 		}
 	}()
+	if s.generator != nil {
+		go s.generator.Start(ctx)
+	}
 	if s.promEnabled {
 		go func() {
 			if err := metrics.StartPromServer(ctx, s.promPort); err != nil {

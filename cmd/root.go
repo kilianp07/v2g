@@ -23,6 +23,8 @@ import (
 
 var cfgPath string
 var demoSeed bool
+var rteGen bool
+var rteGenScenario string
 
 var rootCmd = &cobra.Command{
 	Use:   "v2g",
@@ -33,6 +35,8 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "configuration file")
 	rootCmd.PersistentFlags().BoolVar(&demoSeed, "demo-seed", false, "write sample metrics to Influx and exit")
+	rootCmd.PersistentFlags().BoolVar(&rteGen, "rte-gen", false, "force enable RTE generator")
+	rootCmd.PersistentFlags().StringVar(&rteGenScenario, "rte-gen-scenario", "", "override RTE generator scenario")
 }
 
 // Execute runs the CLI.
@@ -45,6 +49,12 @@ func run(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+	if rteGen {
+		cfg.RTEGenerator.Enabled = true
+	}
+	if rteGenScenario != "" {
+		cfg.RTEGenerator.Scenario = rteGenScenario
 	}
 	mon, err := inframon.NewSentryMonitor(cfg.Sentry)
 	if err != nil {

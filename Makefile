@@ -235,3 +235,7 @@ debug-env: ## Afficher l'environnement de debug
 	@echo "CGO_ENABLED: $(CGO_ENABLED)"
 	@echo "PWD: $(PWD)"
 	@$(GO) env
+
+test-cover: ## Run tests with coverage output
+	$(GO) test ./... -coverprofile=coverage.out
+	$(GO) tool cover -func=coverage.out | tee coverage.txt
