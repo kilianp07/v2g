@@ -30,6 +30,14 @@ metrics:
   influx_org: "my-org"
   influx_bucket: "v2g"
   emission_factor: 50 # gCO2 per kWh
+telemetry:
+  enabled: true
+  mode: "push" # push | pull | hybrid
+  interval_seconds: 10
+  request_topic: "v2g/telemetry/request"
+  response_topic_prefix: "v2g/telemetry/response/"
+  state_topic_prefix: "v2g/vehicle/state/"
+  timeout_seconds: 3
 logging:
   backend: "jsonl" # or 'sqlite'
   path: "dispatch.log"

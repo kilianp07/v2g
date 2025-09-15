@@ -17,12 +17,13 @@ import (
 )
 
 type Config struct {
-	MQTT     mqtt.Config     `json:"mqtt"`
-	Dispatch dispatch.Config `json:"dispatch"`
-	Metrics  metrics.Config  `json:"metrics"`
-	Logging  LoggingConfig   `json:"logging"`
-	RTE      RTEConfig       `json:"rte"`
-	Sentry   SentryConfig    `json:"sentry"`
+	MQTT      mqtt.Config     `json:"mqtt"`
+	Dispatch  dispatch.Config `json:"dispatch"`
+	Metrics   metrics.Config  `json:"metrics"`
+	Logging   LoggingConfig   `json:"logging"`
+	RTE       RTEConfig       `json:"rte"`
+	Sentry    SentryConfig    `json:"sentry"`
+	Telemetry TelemetryConfig `json:"telemetry"`
 }
 
 func Load(path string) (*Config, error) {

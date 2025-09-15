@@ -12,6 +12,7 @@ import (
 	"github.com/kilianp07/v2g/infra/logger"
 	"github.com/kilianp07/v2g/infra/metrics"
 	"github.com/kilianp07/v2g/infra/mqtt"
+	"github.com/kilianp07/v2g/infra/telemetry"
 	"github.com/kilianp07/v2g/internal/eventbus"
 	"github.com/kilianp07/v2g/rte"
 )
@@ -25,6 +26,7 @@ type Service struct {
 	promEnabled bool
 	promPort    string
 	metricsSink coremetrics.MetricsSink
+	telemetry   *telemetry.Manager
 }
 
 // New creates a Service from the configuration.
@@ -81,6 +83,17 @@ func New(cfg *config.Config) (*Service, error) {
 	manager.SetLPFirst(cfg.Dispatch.LPFirst)
 
 	svc := &Service{Manager: manager, bus: bus, log: logg, promEnabled: promEnabled, promPort: promPort, metricsSink: sink}
+	if cfg.Telemetry.Enabled {
+		var rec coremetrics.VehicleStateRecorder
+		if r, ok := sink.(coremetrics.VehicleStateRecorder); ok {
+			rec = r
+		}
+		tm, err := telemetry.NewManager(cfg.MQTT, cfg.Telemetry, rec, disc)
+		if err != nil {
+			return nil, fmt.Errorf("telemetry manager: %w", err)
+		}
+		svc.telemetry = tm
+	}
 	svc.Connector = rte.NewConnector(cfg.RTE, manager)
 	return svc, nil
 }
@@ -92,6 +105,9 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 	signals := make(chan model.FlexibilitySignal, 1)
 	go s.Manager.Run(ctx, signals)
+	if s.telemetry != nil {
+		go s.telemetry.Start(ctx)
+	}
 	go func() {
 		if err := s.Connector.Start(ctx); err != nil {
 			s.log.Errorf("connector error: %v", err)

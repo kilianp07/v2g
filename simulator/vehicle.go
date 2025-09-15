@@ -34,6 +34,11 @@ type SimulatedVehicle struct {
 	Interval    time.Duration
 	Metrics     metrics.MetricsSink
 
+	TelemetryPush           bool
+	TelemetryRequestTopic   string
+	TelemetryResponsePrefix string
+	StateTopicPrefix        string
+
 	// Segment defines the behavioural cluster for this vehicle.
 	Segment string
 	// DisconnectRate is the per-minute probability of an unexpected drop.
@@ -102,6 +107,17 @@ func (v *SimulatedVehicle) Run(ctx context.Context) error {
 		cli.Disconnect(250)
 		return token.Error()
 	}
+
+	if v.TelemetryRequestTopic != "" {
+		if t := cli.Subscribe(v.TelemetryRequestTopic, 0, v.onTelemetryRequest()); t.Wait() && t.Error() != nil {
+			cli.Disconnect(250)
+			return t.Error()
+		}
+		if t := cli.Subscribe(strings.TrimSuffix(v.TelemetryRequestTopic, "/")+"/"+v.ID, 0, v.onTelemetryRequest()); t.Wait() && t.Error() != nil {
+			cli.Disconnect(250)
+			return t.Error()
+		}
+	}
 	<-ctx.Done()
 	close(v.ackCh)
 	wg.Wait()
@@ -168,6 +184,12 @@ func (v *SimulatedVehicle) onDiscovery() func(paho.Client, paho.Message) {
 			return
 		}
 		log.Printf("%s responded to discovery", v.ID)
+	}
+}
+
+func (v *SimulatedVehicle) onTelemetryRequest() func(paho.Client, paho.Message) {
+	return func(_ paho.Client, _ paho.Message) {
+		v.publishTelemetry(time.Now())
 	}
 }
 
@@ -274,16 +296,8 @@ func (v *SimulatedVehicle) batteryLoop(ctx context.Context) {
 					Time:      now,
 				})
 			}
-			state, _ := json.Marshal(struct {
-				SoC float64 `json:"soc"`
-			}{SoC: soc})
-			topic := strings.TrimSuffix(v.TopicPrefix, "/") + "/vehicle/state/" + v.ID
-			t := v.client.Publish(topic, 0, false, state)
-			if !t.WaitTimeout(5 * time.Second) {
-				log.Printf("%s: state publish timeout", v.ID)
-			}
-			if err := t.Error(); err != nil {
-				log.Printf("%s: publish state error: %v", v.ID, err)
+			if v.TelemetryPush {
+				v.publishTelemetry(now)
 			}
 		case <-ctx.Done():
 			return
@@ -367,13 +381,47 @@ func (v *SimulatedVehicle) handleAvailabilityTick(ctx context.Context) {
 }
 
 func (v *SimulatedVehicle) publishAvailability(avail bool) {
-	payload, _ := json.Marshal(struct {
-		Available bool `json:"available"`
-	}{avail})
 	if v.client == nil {
 		return
 	}
-	topic := strings.TrimSuffix(v.TopicPrefix, "/") + "/vehicle/state/" + v.ID
+	now := time.Now()
+	v.mu.Lock()
+	soc := 0.0
+	power := v.currentPower
+	if v.Battery != nil {
+		soc = v.Battery.Soc
+	}
+	v.mu.Unlock()
+	payload, _ := json.Marshal(struct {
+		VehicleID string  `json:"vehicle_id"`
+		SoC       float64 `json:"soc"`
+		Available bool    `json:"available"`
+		Charging  bool    `json:"charging"`
+		PowerKW   float64 `json:"power_kw"`
+		TS        int64   `json:"ts"`
+	}{v.ID, soc, avail, power > 0, power, now.Unix()})
+	topic := strings.TrimSuffix(v.StateTopicPrefix, "/") + "/" + v.ID
 	t := v.client.Publish(topic, 0, false, payload)
 	t.WaitTimeout(2 * time.Second)
+}
+
+func (v *SimulatedVehicle) publishTelemetry(now time.Time) {
+	v.mu.Lock()
+	soc := 0.0
+	power := v.currentPower
+	if v.Battery != nil {
+		soc = v.Battery.Soc
+	}
+	v.mu.Unlock()
+	payload, _ := json.Marshal(struct {
+		VehicleID string  `json:"vehicle_id"`
+		SoC       float64 `json:"soc"`
+		Available bool    `json:"available"`
+		Charging  bool    `json:"charging"`
+		PowerKW   float64 `json:"power_kw"`
+		TS        int64   `json:"ts"`
+	}{v.ID, soc, true, power > 0, power, now.Unix()})
+	topic := strings.TrimSuffix(v.StateTopicPrefix, "/") + "/" + v.ID
+	t := v.client.Publish(topic, 0, false, payload)
+	t.WaitTimeout(5 * time.Second)
 }

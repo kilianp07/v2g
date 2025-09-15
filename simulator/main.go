@@ -102,6 +102,11 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.BatteryProfile, "battery-profile", "", "predefined battery profile (small,medium,large)")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "enable verbose logging")
 	flag.StringVar(&cfg.TopicPrefix, "topic-prefix", "v2g", "MQTT topic prefix")
+	flag.BoolVar(&cfg.TelemetryPush, "telemetry-push", false, "enable telemetry push")
+	flag.DurationVar(&cfg.TelemetryInterval, "telemetry-interval", 10*time.Second, "telemetry interval")
+	flag.StringVar(&cfg.TelemetryRequestTopic, "telemetry-request-topic", "v2g/telemetry/request", "telemetry request topic")
+	flag.StringVar(&cfg.TelemetryResponsePrefix, "telemetry-response-prefix", "v2g/telemetry/response/", "telemetry response topic prefix")
+	flag.StringVar(&cfg.StateTopicPrefix, "state-topic-prefix", "v2g/vehicle/state/", "telemetry state topic prefix")
 	flag.StringVar(&cfg.InfluxURL, "influx-url", "", "InfluxDB URL")
 	flag.StringVar(&cfg.InfluxToken, "influx-token", "", "InfluxDB token")
 	flag.StringVar(&cfg.InfluxOrg, "influx-org", "", "InfluxDB organization")
@@ -184,10 +189,14 @@ func runVehicles(ctx context.Context, vehicles []SimulatedVehicle, cfg Config, s
 		v.Broker = cfg.Broker
 		v.TopicPrefix = cfg.TopicPrefix
 		v.Strategy = strat
-		v.Interval = cfg.Interval
+		v.Interval = cfg.TelemetryInterval
 		v.MaxPower = cfg.MaxPower
 		v.Battery = b
 		v.Metrics = sink
+		v.TelemetryPush = cfg.TelemetryPush
+		v.TelemetryRequestTopic = cfg.TelemetryRequestTopic
+		v.TelemetryResponsePrefix = cfg.TelemetryResponsePrefix
+		v.StateTopicPrefix = cfg.StateTopicPrefix
 		wg.Add(1)
 		go func(v *SimulatedVehicle) {
 			defer wg.Done()
