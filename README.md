@@ -21,6 +21,19 @@ Prometheus metrics.
 Copy `config.example.yaml` to `config.yaml` and adjust the MQTT credentials to
 match your broker.
 
+## RTE Signal Generator (preprod)
+
+An internal generator can emit synthetic RTE flexibility signals for
+demonstrations. Enable it in the configuration under `rteGenerator` or via the
+CLI flag `--rte-gen`:
+
+```bash
+v2g -c config.preprod.yaml --rte-gen --rte-gen-scenario steady
+```
+
+Generated signals are published on the internal event bus and recorded through
+existing metrics sinks.
+
 ## Telemetry
 
 The service can collect vehicle state in two modes:

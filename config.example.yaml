@@ -54,6 +54,19 @@ rte:
     client_secret: ""
     token_url: "https://auth.rte.com/token"
     poll_interval_seconds: 60
+rteGenerator:
+  enabled: false
+  mode: "internal"
+  scenario: "steady"
+  min_interval_seconds: 120
+  max_interval_seconds: 300
+  min_duration_seconds: 120
+  max_duration_seconds: 600
+  min_power_kw: 5
+  max_power_kw: 25
+  signal_types: ["FCR"]
+  jitter_pct: 0.15
+  seed: 42
 sentry:
   dsn: "https://examplePublicKey@o0.ingest.sentry.io/0"
   environment: "preprod"
