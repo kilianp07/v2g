@@ -1,6 +1,6 @@
 # Makefile pour V2G - Tests d'intégration et préproduction
 
-.PHONY: help test test-unit test-integration test-e2e test-critical test-qa test-all coverage clean validate-preprod
+.PHONY: help test test-unit test-integration test-e2e test-critical test-qa test-all coverage clean validate-preprod e2e
 
 # Variables
 GO = go
@@ -37,8 +37,13 @@ test-integration: ## Exécuter les tests d'intégration
 	$(GO) test -v -race -timeout=$(TIMEOUT) -run="Integration" -tags="no_containers" ./test/...
 
 test-e2e: ## Exécuter les tests end-to-end
-	@echo "🌐 Exécution des tests end-to-end..."
-	$(GO) test -v -race -timeout=$(TIMEOUT) -run="E2E|EndToEnd" ./test/...
+        @echo "🌐 Exécution des tests end-to-end..."
+        $(GO) test -v -race -timeout=$(TIMEOUT) -run="E2E|EndToEnd" ./test/...
+
+e2e: ## Exécuter la suite E2E Demo-Assurance
+	@echo "🚗 Exécution de la suite E2E Demo-Assurance..."
+	@mkdir -p $(COVERAGE_DIR)
+	$(GO) test -v -timeout=$(TIMEOUT) ./e2e -coverprofile=$(COVERAGE_DIR)/e2e.out -covermode=atomic
 
 test-critical: ## Exécuter les tests de scénarios critiques
 	@echo "⚡ Exécution des tests de scénarios critiques..."

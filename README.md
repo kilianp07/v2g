@@ -13,6 +13,21 @@ Go 1.20 or later is required.
 go test ./...
 ```
 
+### Tests E2E Demo-Assurance
+
+The repository ships with a lightweight end-to-end suite exercising a full stack
+(Mosquitto, InfluxDB and the V2X service). It is intended to secure the demo
+environment by validating that basic telemetry and dispatch flows work.
+
+Run the suite locally with Docker installed:
+
+```bash
+make e2e
+```
+
+The tests emit a JUnit XML report and coverage file under `coverage/`. A typical
+run completes in a couple of minutes.
+
 Integration and end-to-end tests rely on helper utilities under
 `test/util`. These helpers provide functions for waiting on the mock RTE
 server, launching a Mosquitto broker for MQTT-based tests and polling
