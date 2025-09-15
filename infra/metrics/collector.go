@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/kilianp07/v2g/core/events"
@@ -39,12 +38,12 @@ func StartEventCollector(ctx context.Context, bus eventbus.EventBus, sink coreme
 							errStr = e.Err.Error()
 						}
 						_ = r.RecordDispatchAck(coremetrics.DispatchAckEvent{
+							OrderID:      e.OrderID,
 							VehicleID:    e.VehicleID,
 							Signal:       e.Signal,
 							Acknowledged: e.Acknowledged,
 							Latency:      e.Latency,
 							Error:        errStr,
-							DispatchID:   strconv.FormatInt(time.Now().UnixNano(), 10),
 							Time:         time.Now(),
 						})
 					}

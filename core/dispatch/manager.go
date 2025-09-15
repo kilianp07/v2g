@@ -135,16 +135,16 @@ func (m *DispatchManager) Run(ctx context.Context, signals <-chan model.Flexibil
 // sendAndWait sends the command and waits for an acknowledgment while measuring
 // the latency.
 
-func (m *DispatchManager) sendAndWait(id string, power float64) (bool, time.Duration, error) {
+func (m *DispatchManager) sendAndWait(id string, power float64) (string, bool, time.Duration, error) {
 	start := time.Now()
 	cmdID, err := m.publisher.SendOrder(id, power)
 	if err != nil {
 		mqttFailure.Inc()
-		return false, time.Since(start), err
+		return "", false, time.Since(start), err
 	}
 	mqttSuccess.Inc()
 	ack, err := m.publisher.WaitForAck(cmdID, m.ackTimeout)
-	return ack, time.Since(start), err
+	return cmdID, ack, time.Since(start), err
 }
 
 // NewDispatchManager creates a new manager.
@@ -328,7 +328,7 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 		lat      []metrics.DispatchLatency
 		ackCount int
 	)
-	update := func(id string, ack bool, err error, dur time.Duration) {
+	update := func(id, orderID string, ack bool, err error, dur time.Duration) {
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -339,6 +339,7 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 		dispatchLatency.WithLabelValues(signal.Type.String()).Observe(dur.Seconds())
 		if m.bus != nil {
 			m.bus.Publish(events.AckEvent{
+				OrderID:      orderID,
 				VehicleID:    id,
 				Signal:       signal.Type,
 				Acknowledged: ack && err == nil,
@@ -363,7 +364,7 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 		go func(id string, p float64) {
 			defer wg.Done()
 			defer monitoring.Recover()
-			ack, d, err := m.sendAndWait(id, p)
+			orderID, ack, d, err := m.sendAndWait(id, p)
 			if err != nil {
 				monitoring.CaptureException(err, map[string]string{
 					"vehicle_id":  id,
@@ -371,7 +372,19 @@ func (m *DispatchManager) dispatchAssignments(res *DispatchResult, signal model.
 					"module":      "dispatch_manager",
 				})
 			}
-			update(id, ack, err, d)
+			update(id, orderID, ack, err, d)
+			if rec, ok := m.metrics.(metrics.DispatchOrderRecorder); ok {
+				_ = rec.RecordDispatchOrder(metrics.DispatchOrderEvent{
+					OrderID:     orderID,
+					VehicleID:   id,
+					Signal:      signal.Type,
+					PowerKW:     p,
+					Score:       res.Scores[id],
+					MarketPrice: res.MarketPrice,
+					Accepted:    err == nil && ack,
+					Time:        time.Now(),
+				})
+			}
 		}(id, power)
 	}
 	wg.Wait()

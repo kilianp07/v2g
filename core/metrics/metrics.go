@@ -52,13 +52,15 @@ type VehicleStateRecorder interface {
 }
 
 // DispatchOrderEvent represents a command sent to a vehicle.
+// DispatchOrderEvent represents a command sent to a vehicle.
 type DispatchOrderEvent struct {
-	DispatchID  string
+	OrderID     string
 	VehicleID   string
 	Signal      model.SignalType
 	PowerKW     float64
 	Score       float64
 	MarketPrice float64
+	Accepted    bool
 	Time        time.Time
 }
 
@@ -68,8 +70,9 @@ type DispatchOrderRecorder interface {
 }
 
 // DispatchAckEvent captures the acknowledgment for an order.
+// DispatchAckEvent captures the acknowledgment for an order.
 type DispatchAckEvent struct {
-	DispatchID   string
+	OrderID      string
 	VehicleID    string
 	Signal       model.SignalType
 	Acknowledged bool

@@ -123,11 +123,12 @@ func (v *SimulatedVehicle) onCommand(ctx context.Context) func(paho.Client, paho
 		allowed := v.applyPowerOrder(m.PowerKW)
 		if rec, ok := v.Metrics.(metrics.DispatchOrderRecorder); ok {
 			_ = rec.RecordDispatchOrder(metrics.DispatchOrderEvent{
-				DispatchID: m.CommandID,
-				VehicleID:  v.ID,
-				Signal:     model.SignalFCR,
-				PowerKW:    allowed,
-				Time:       now,
+				OrderID:   m.CommandID,
+				VehicleID: v.ID,
+				Signal:    model.SignalFCR,
+				PowerKW:   allowed,
+				Accepted:  true,
+				Time:      now,
 			})
 		}
 		cmd := command{id: m.CommandID, power: allowed, received: now}
@@ -180,7 +181,7 @@ func (v *SimulatedVehicle) worker(ctx context.Context) {
 			sent := v.Strategy.Ack(ctx, v.client, v.ID, cmd.id)
 			if rec, ok := v.Metrics.(metrics.DispatchAckRecorder); ok {
 				_ = rec.RecordDispatchAck(metrics.DispatchAckEvent{
-					DispatchID:   cmd.id,
+					OrderID:      cmd.id,
 					VehicleID:    v.ID,
 					Signal:       model.SignalFCR,
 					Acknowledged: sent,
